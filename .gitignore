@@ -1,0 +1,10 @@
+.pio/
+.vscode/
+.idea/
+*.bin
+*.elf
+*.hex
+*.o
+*.a
+.DS_Store
+Thumbs.db
