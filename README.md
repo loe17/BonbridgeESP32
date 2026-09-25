@@ -76,20 +76,20 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 
 ## Software auf den ESP32 übertragen
 
-Am einfachsten geht das mit **PlatformIO** (in VS Code) oder der **Arduino IDE**:
-
-### Mit PlatformIO:
-1. Projektordner `BonbridgeESP32` in VS Code mit der PlatformIO-Erweiterung öffnen.
-2. ESP32-S3 per Programmier-USB-Kabel an den Computer anschließen.
-3. Unten in der Leiste auf den Haken (**Build**) und dann auf den Pfeil (**Upload**) klicken.
-
 ### Mit der Arduino IDE:
-1. Datei `src/main.cpp` öffnen (oder in ein `.ino`-Projekt kopieren).
-2. Board auswählen: **ESP32S3 Dev Module**.
-3. Einstellungen:
-   * **USB Mode:** *Hardware CDC and JTAG* (oder *OTG*)
+1. Starte die **Arduino IDE**.
+2. Klicke im Menü auf **Datei -> Öffnen...** (oder drücke `Strg + O`).
+3. Wähle im Ordner `BonbridgeESP32` die Datei **`BonbridgeESP32.ino`** aus.
+4. Alle Programmteile öffnen sich nun automatisch als übersichtliche Reiter (Tabs).
+5. Wähle unter **Werkzeuge -> Board -> esp32** dein Board aus: **ESP32S3 Dev Module**.
+6. Stelle unter **Werkzeuge** sicher:
+   * **USB Mode:** *Hardware CDC and JTAG*
    * **USB CDC On Boot:** *Enabled*
-4. Auf **Hochladen** klicken.
+7. Verbinde den ESP32-S3 per USB-Kabel mit dem Computer, wähle den passenden **Port** aus und klicke auf den Pfeil (**Hochladen**).
+
+### Mit PlatformIO (VS Code):
+1. Projektordner `BonbridgeESP32` in VS Code öffnen.
+2. Unten in der Leiste auf den Haken (**Build**) und dann auf den Pfeil (**Upload**) klicken.
 
 ---
 
