@@ -23,6 +23,11 @@ Er nimmt Druckaufträge über ein **Netzwerkkabel (LAN)** oder über **WLAN** en
   * Test-Knöpfe für **Drucktest** und **Kassenlade öffnen**.
   * Auswahl des **Druckprofils** (Epson TM-T88, Standard 80 mm, Kompakt 58 mm, Star).
   * Schalter: **Hinweis drucken wenn Netzwerk ausfällt**.
+* **Bequeme WLAN-Suche & Live-Verbindung in der Web-Oberfläche:**
+  * **🔍 WLAN suchen:** Findet alle Funknetze in Reichweite mit Signalstärke (z. B. 📶 85%) und Schlosssymbol. Ein Klick genügt, um das gewünschte WLAN auszuwählen.
+  * **Passwort einblenden (👁️):** Zeigt das eingegebene Passwort im Klartext an, um Tippfehler sofort zu vermeiden.
+  * **Direkt verbinden mit Live-Rückmeldung:** Ein Klick auf *„Mit diesem WLAN verbinden“* stellt die Verbindung her und zeigt nach wenigen Sekunden die neue IP-Adresse als anklickbaren Link an – oder bei Fehlern (z. B. Passwort falsch) eine verständliche Erklärung.
+  * **Automatischer Einrichtungs-Hotspot (`Bonbridge-Setup`):** Ist noch kein WLAN hinterlegt oder der Router nicht erreichbar, spannt der Adapter ein eigenes Hilfsnetzwerk auf (`Bonbridge-Setup` unter `http://192.168.4.1`). So kann man das WLAN kinderleicht direkt vom Smartphone oder Laptop einrichten!
 * **Netzwerk-Wächter (Ausfall-Alarm):**
   * Bricht die Netzwerkverbindung komplett ab, druckt der Drucker selbstständig einen Warnzettel aus:  
     *„Achtung: Netzwerkverbindung unterbrochen! Bitte LAN-Kabel oder Router prüfen.“*
@@ -113,17 +118,22 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
      * Den Status deines angeschlossenen USB-Bondruckers
 
 3. **Web-Oberfläche öffnen:**
-   * Stecke das LAN-Kabel ein (oder nutze die im Monitor angezeigte IP-Adresse).
-   * Öffne im Browser: `http://<IP-Adresse-des-ESP>/`
+   * **Über LAN-Kabel:** Stecke das Netzwerkkabel ein und öffne die im Seriellen Monitor angezeigte Adresse (z. B. `http://192.168.178.50`).
+   * **Über den Einrichtungs-Hotspot:** Ist kein Kabel gesteckt und kein WLAN verbunden, verbinde dein Smartphone oder deinen Laptop mit dem WLAN **`Bonbridge-Setup`** (ohne Passwort) und öffne im Browser **`http://192.168.4.1`**.
 
-4. **Einstellen:**
-   * **Aktuelle Verbindung:** Die Seite zeigt dir oben direkt an, ob LAN oder WLAN genutzt wird.
-   * **WLAN eintragen:** Trage deinen WLAN-Namen und das Passwort ein, damit der Adapter automatisch darauf zurückgreifen kann, falls das Kabel einmal abgezogen wird.
-   * **Drucktest & Kassenlade:** Klicke auf die Test-Knöpfe, um Drucker und Geldschublade direkt vom Browser aus zu testen.
-   * Klicke auf **Einstellungen speichern**.
+4. **WLAN suchen & verbinden:**
+   * Klicke neben dem Feld *WLAN Name* auf **`🔍 Suchen`**.
+   * Nach ein bis zwei Sekunden erscheint eine Liste aller gefundenen Funknetze mit Empfangsstärke und Schlosssymbol.
+   * Klicke dein Netzwerk in der Liste an – der Name wird automatisch ins Textfeld eingetragen.
+   * Gib dein WLAN-Passwort ein (mit dem **`👁️`**-Symbol kannst du kontrollieren, ob alles richtig geschrieben ist).
+   * Klicke auf **`Mit diesem WLAN verbinden`**:
+     * Der Adapter stellt nun sofort die Verbindung her.
+     * Nach wenigen Sekunden erhältst du direkt im Browser die Erfolgsmeldung mit der neuen IP-Adresse und einem anklickbaren Link!
+     * Falls das Passwort falsch war oder der Empfang abbricht, wird dir der Grund sofort in verständlichem Deutsch angezeigt.
+   * **Drucktest & Kassenlade:** Über die Schnell-Test-Knöpfe kannst du den Drucker und die Geldschublade direkt ausprobieren.
 
 5. **Im Kassensystem einrichten:**
    * Wähle in deiner Kassen-App (z. B. Kassensoftware) **Netzwerk-Drucker / ESC-POS**.
-   * Gib die **IP-Adresse** des ESP32 ein.
+   * Gib die vergebene **IP-Adresse** des BonbridgeESP32 ein.
    * Gib als Port **9100** ein.
    * Fertig! Ab sofort druckt deine Kasse zuverlässig über den Adapter.

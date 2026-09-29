@@ -21,6 +21,9 @@ private:
     void handleRoot();
     void handleAction();
     void handleSave();
+    void handleScan();
+    void handleConnect();
+    void handleStatus();
     void handleNotFound();
 
     String generateHtmlPage();

@@ -63,13 +63,16 @@ static void onWiFiEthEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
             Serial.print("  Kassen-Drucker-Port: "); Serial.print(WiFi.localIP()); Serial.println(":9100");
             Serial.println("--------------------------------------------------");
             Serial.println();
+            if (s_instance) {
+                s_instance->onConnectEvent();
+            }
             break;
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: {
             uint8_t reason = info.wifi_sta_disconnected.reason;
             Serial.printf("[WLAN-INFO] Verbindungsversuch fehlgeschlagen (Code %d: %s)\n",
                           reason, getWifiReasonText(reason));
             if (s_instance) {
-                s_instance->onDisconnectEvent();
+                s_instance->onDisconnectEvent(reason);
             }
             break;
         }
@@ -85,13 +88,29 @@ NetManager::NetManager() :
     lastCheckMs(0),
     wifiConnectStartMs(0),
     wifiAttemptActive(false),
-    disconnectCount(0)
+    disconnectCount(0),
+    connectState(WIFI_STATE_IDLE),
+    lastConnectError("")
 {
     s_instance = this;
 }
 
-void NetManager::onDisconnectEvent() {
+void NetManager::onDisconnectEvent(uint8_t reason) {
     disconnectCount++;
+    if (connectState == WIFI_STATE_CONNECTING) {
+        if (reason == 202 || disconnectCount >= 2) {
+            connectState = WIFI_STATE_FAILED;
+            lastConnectError = getWifiReasonText(reason);
+        }
+    }
+}
+
+void NetManager::onConnectEvent() {
+    connectState = WIFI_STATE_CONNECTED;
+    lastConnectError = "";
+    disconnectCount = 0;
+    wifiConnected = true;
+    currentMode = NET_MODE_WIFI;
 }
 
 NetManager& NetManager::instance() {
@@ -181,6 +200,12 @@ void NetManager::checkConnections() {
     // Wenn WLAN-Verbindung versucht wird, aber nach 12s oder 4 Fehlversuchen nicht klappt
     if (wifiAttemptActive && !wifiConnected && !ethLinkUp) {
         if ((millis() - wifiConnectStartMs > 12000) || disconnectCount >= 4) {
+            if (connectState == WIFI_STATE_CONNECTING) {
+                connectState = WIFI_STATE_FAILED;
+                if (lastConnectError.length() == 0) {
+                    lastConnectError = "Keine Verbindung moeglich (Zeitueberschreitung)";
+                }
+            }
             Serial.println();
             Serial.println("==================================================");
             Serial.println("[WLAN-HINWEIS] Verbindung zum WLAN-Router nicht moeglich.");
@@ -265,7 +290,10 @@ String NetManager::getIpAddress() {
     if (currentMode == NET_MODE_ETHERNET) {
         return ETH.localIP().toString();
     } else if (currentMode == NET_MODE_WIFI) {
-        if (WiFi.getMode() == WIFI_AP) {
+        if (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0)) {
+            return WiFi.localIP().toString();
+        }
+        if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
             return WiFi.softAPIP().toString();
         }
         return WiFi.localIP().toString();
@@ -299,4 +327,96 @@ bool NetManager::isEthernetLinkUp() {
 
 bool NetManager::isWifiConnected() {
     return wifiConnected;
+}
+
+std::vector<WifiNetworkInfo> NetManager::scanNetworks() {
+    std::vector<WifiNetworkInfo> results;
+    Serial.println("[WLAN] Suche nach verfuegbaren Netzwerken...");
+
+    wifi_mode_t prevMode = WiFi.getMode();
+    if (prevMode == WIFI_OFF) {
+        WiFi.mode(WIFI_STA);
+    } else if (prevMode == WIFI_AP) {
+        WiFi.mode(WIFI_AP_STA);
+    }
+
+    int n = WiFi.scanNetworks(false, false, false, 200);
+    Serial.printf("[WLAN] Scan abgeschlossen: %d Netzwerke gefunden.\n", n);
+
+    if (n > 0) {
+        for (int i = 0; i < n; ++i) {
+            String s = WiFi.SSID(i);
+            if (s.length() == 0) continue;
+
+            WifiNetworkInfo item;
+            item.ssid = s;
+            item.rssi = WiFi.RSSI(i);
+            item.isSecure = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+
+            int quality = 2 * (item.rssi + 100);
+            if (quality < 0) quality = 0;
+            if (quality > 100) quality = 100;
+            item.signalPercent = quality;
+
+            bool duplicate = false;
+            for (auto& existing : results) {
+                if (existing.ssid == item.ssid) {
+                    duplicate = true;
+                    if (item.rssi > existing.rssi) {
+                        existing = item;
+                    }
+                    break;
+                }
+            }
+            if (!duplicate) {
+                results.push_back(item);
+            }
+        }
+        WiFi.scanDelete();
+    }
+
+    if (prevMode == WIFI_OFF && results.empty()) {
+        WiFi.mode(WIFI_OFF);
+    }
+
+    return results;
+}
+
+void NetManager::connectToWifi(const String& ssid, const String& pass) {
+    AppConfig& conf = ConfigManager::instance().get();
+    conf.wifi_ssid = ssid;
+    if (pass.length() > 0) {
+        conf.wifi_password = pass;
+    }
+    ConfigManager::instance().save();
+
+    connectState = WIFI_STATE_CONNECTING;
+    lastConnectError = "";
+    disconnectCount = 0;
+
+    Serial.printf("[WLAN] Verbinde mit '%s' (Passwort: %d Zeichen)...\n", 
+                  conf.wifi_ssid.c_str(), conf.wifi_password.length());
+
+    if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+        WiFi.mode(WIFI_AP_STA);
+    } else {
+        WiFi.mode(WIFI_STA);
+    }
+
+    WiFi.setHostname("BonbridgeESP32");
+    WiFi.setAutoReconnect(true);
+    WiFi.setTxPower(WIFI_POWER_15dBm);
+    WiFi.disconnect(false);
+    WiFi.begin(conf.wifi_ssid.c_str(), conf.wifi_password.c_str());
+
+    wifiAttemptActive = true;
+    wifiConnectStartMs = millis();
+}
+
+WifiConnectState NetManager::getConnectState() const {
+    return connectState;
+}
+
+String NetManager::getLastConnectError() const {
+    return lastConnectError;
 }
