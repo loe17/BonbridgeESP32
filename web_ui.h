@@ -24,6 +24,9 @@ private:
     void handleScan();
     void handleConnect();
     void handleStatus();
+    void handleOtaStart();
+    void handleOtaStatus();
+    void handleOtaUpload();
     void handleNotFound();
 
     String generateHtmlPage();

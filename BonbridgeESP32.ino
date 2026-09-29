@@ -5,6 +5,7 @@
 #include "raw_server.h"
 #include "web_ui.h"
 #include "netwatch.h"
+#include "ota_updater.h"
 #include <esp_log.h>
 
 static const char* TAG = "Main";
@@ -103,6 +104,9 @@ void loop() {
 
     // 6. Auf Ausfall des Netzwerks prüfen
     NetWatch::instance().update();
+
+    // 7. OTA Firmware-Update Status & Neustart verarbeiten
+    OtaUpdater::instance().update();
 
     // Kurzer Yield für FreeRTOS
     delay(1);

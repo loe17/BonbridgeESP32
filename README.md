@@ -28,6 +28,10 @@ Er nimmt Druckaufträge über ein **Netzwerkkabel (LAN)** oder über **WLAN** en
   * **Passwort einblenden (👁️):** Zeigt das eingegebene Passwort im Klartext an, um Tippfehler sofort zu vermeiden.
   * **Direkt verbinden mit Live-Rückmeldung:** Ein Klick auf *„Mit diesem WLAN verbinden“* stellt die Verbindung her und zeigt nach wenigen Sekunden die neue IP-Adresse als anklickbaren Link an – oder bei Fehlern (z. B. Passwort falsch) eine verständliche Erklärung.
   * **Automatischer Einrichtungs-Hotspot (`Bonbridge-Setup`):** Ist noch kein WLAN hinterlegt oder der Router nicht erreichbar, spannt der Adapter ein eigenes Hilfsnetzwerk auf (`Bonbridge-Setup` unter `http://192.168.4.1`). So kann man das WLAN kinderleicht direkt vom Smartphone oder Laptop einrichten!
+* **Drahtlose Firmware-Aktualisierung (Funk-Update / OTA):**
+  * **Direkt von GitHub:** Lädt mit einem Klick die neueste Firmware (`firmware.bin`) aus dem GitHub-Repository herunter und installiert sie.
+  * **Manuelle Datei:** Ermöglicht das Hochladen einer eigenen `.bin`-Datei direkt über den Web-Browser.
+  * **Live-Balken & Sicherheit:** Zeigt den Fortschritt von 0–100 % in Echtzeit an; alle gespeicherten WLAN- und Druckereinstellungen bleiben beim Update vollständig erhalten.
 * **Netzwerk-Wächter (Ausfall-Alarm):**
   * Bricht die Netzwerkverbindung komplett ab, druckt der Drucker selbstständig einen Warnzettel aus:  
     *„Achtung: Netzwerkverbindung unterbrochen! Bitte LAN-Kabel oder Router prüfen.“*
@@ -76,6 +80,10 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 | **D+** (Grün) | **GPIO 20** |
 | **+5V** (Rot) | **5V Stromversorgung** |
 | **GND** (Schwarz) | **GND** |
+
+> [!IMPORTANT]
+> **Wichtig – Keinen USB-C-Hub verwenden:**
+> Ein USB-Hub (Mehrfachverteiler) besitzt einen eigenen Steuerchip und verhindert, dass der ESP32-S3 den Drucker erkennt. Verwende stattdessen einen einfachen **USB-OTG-Adapter** (USB-C auf USB-A) oder ein **OTG-Y-Kabel** mit direkter Stromeinspeisung.
 
 ---
 
@@ -137,3 +145,10 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
    * Gib die vergebene **IP-Adresse** des BonbridgeESP32 ein.
    * Gib als Port **9100** ein.
    * Fertig! Ab sofort druckt deine Kasse zuverlässig über den Adapter.
+
+6. **Firmware drahtlos aktualisieren (Funk-Update / OTA):**
+   * Rufe die Weboberfläche im Browser auf.
+   * Scrolle nach unten zum Bereich **Firmware-Aktualisierung (Funk-Update / OTA)**.
+   * **Methode A (GitHub):** Klicke auf `📥 Firmware direkt von GitHub laden & installieren`. Der Adapter lädt die neueste Version verschlüsselt herunter, installiert sie und startet automatisch neu.
+   * **Methode B (Datei):** Wähle über `Datei auswählen` eine kompilierte `.bin`-Datei von deinem Computer aus und klicke auf `Upload & Flashen`.
+   * Während des Vorgangs siehst du einen Echtzeit-Ladebalken. Alle gespeicherten WLAN- und Druckeinstellungen bleiben vollständig erhalten.

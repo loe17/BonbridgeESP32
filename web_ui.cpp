@@ -3,6 +3,7 @@
 #include "net_manager.h"
 #include "usb_printer.h"
 #include "raw_server.h"
+#include "ota_updater.h"
 #include <esp_log.h>
 
 static const char* TAG = "WebUI";
@@ -28,6 +29,22 @@ bool WebUI::begin(uint16_t port) {
     server->on("/api/scan", HTTP_GET, [this]() { handleScan(); });
     server->on("/api/connect", HTTP_POST, [this]() { handleConnect(); });
     server->on("/api/status", HTTP_GET, [this]() { handleStatus(); });
+    server->on("/api/ota/start", HTTP_POST, [this]() { handleOtaStart(); });
+    server->on("/api/ota/status", HTTP_GET, [this]() { handleOtaStatus(); });
+    server->on("/api/ota/upload", HTTP_POST, 
+        [this]() { 
+            if (!server) return;
+            OtaState st = OtaUpdater::instance().getState();
+            if (st == OTA_STATE_SUCCESS) {
+                server->send(200, "application/json", "{\"status\":\"success\"}");
+            } else {
+                server->send(500, "application/json", "{\"status\":\"error\",\"error\":\"" + OtaUpdater::instance().getErrorMessage() + "\"}");
+            }
+        }, 
+        [this]() { 
+            handleOtaUpload(); 
+        }
+    );
     server->onNotFound([this]() { handleNotFound(); });
 
     server->begin();
@@ -167,6 +184,54 @@ void WebUI::handleStatus() {
     server->send(200, "application/json", json);
 }
 
+void WebUI::handleOtaStart() {
+    if (!server) return;
+    String url = server->hasArg("url") ? server->arg("url") : "";
+    bool ok = OtaUpdater::instance().startHttpUpdate(url);
+    if (ok) {
+        server->send(200, "application/json", "{\"status\":\"started\"}");
+    } else {
+        server->send(400, "application/json", "{\"status\":\"busy\",\"error\":\"Update laeuft bereits\"}");
+    }
+}
+
+void WebUI::handleOtaStatus() {
+    if (!server) return;
+    OtaState st = OtaUpdater::instance().getState();
+    String stStr = "idle";
+    if (st == OTA_STATE_STARTING) stStr = "starting";
+    else if (st == OTA_STATE_DOWNLOADING) stStr = "downloading";
+    else if (st == OTA_STATE_FLASHING) stStr = "flashing";
+    else if (st == OTA_STATE_SUCCESS) stStr = "success";
+    else if (st == OTA_STATE_ERROR) stStr = "error";
+
+    String json = "{";
+    json += "\"state\":\"" + stStr + "\",";
+    json += "\"progress\":" + String(OtaUpdater::instance().getProgress()) + ",";
+    json += "\"statusText\":\"" + OtaUpdater::instance().getStatusString() + "\",";
+    json += "\"error\":\"" + OtaUpdater::instance().getErrorMessage() + "\"";
+    json += "}";
+    server->send(200, "application/json", json);
+}
+
+void WebUI::handleOtaUpload() {
+    if (!server) return;
+    HTTPUpload& upload = server->upload();
+
+    if (upload.status == UPLOAD_FILE_START) {
+        Serial.printf("[OTA-UPLOAD] Dateiempfang gestartet: %s\n", upload.filename.c_str());
+        OtaUpdater::instance().handleUploadStart();
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+        OtaUpdater::instance().handleUploadData(upload.buf, upload.currentSize, upload.totalSize, 0);
+    } else if (upload.status == UPLOAD_FILE_END) {
+        Serial.printf("[OTA-UPLOAD] Datei vollstaendig empfangen: %u Bytes\n", upload.totalSize);
+        OtaUpdater::instance().handleUploadEnd(true);
+    } else if (upload.status == UPLOAD_FILE_ABORTED) {
+        Serial.println("[OTA-UPLOAD] Upload wurde abgebrochen!");
+        OtaUpdater::instance().handleUploadEnd(false);
+    }
+}
+
 void WebUI::handleNotFound() {
     if (server) {
         server->send(404, "text/plain", "404 - Seite nicht gefunden");
@@ -224,6 +289,11 @@ String WebUI::generateHtmlPage() {
     html += ".wifi-card-info { background: #cff4fc; color: #055160; border: 1px solid #b6effb; }";
     html += ".wifi-card-success { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }";
     html += ".wifi-card-danger { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }";
+    html += ".btn-update { background: #6f42c1; color: #fff; width: 100%; padding: 11px; margin-top: 10px; font-size: 14px; border-radius: 5px; }";
+    html += ".btn-upload { background: #fd7e14; color: #fff; padding: 8px 14px; font-size: 13px; border-radius: 4px; white-space: nowrap; }";
+    html += ".progress-container { width: 100%; background: #e9ecef; border-radius: 5px; height: 22px; overflow: hidden; margin-top: 12px; display: none; }";
+    html += ".progress-bar { height: 100%; background: #0d6efd; width: 0%; text-align: center; color: #fff; font-size: 12px; line-height: 22px; transition: width 0.3s; font-weight: bold; }";
+    html += ".file-input-wrapper { display: flex; gap: 8px; align-items: center; margin-top: 6px; }";
     html += "button:hover { opacity: 0.9; }";
     html += "label { display: block; margin-top: 12px; font-size: 13px; font-weight: 600; color: #444; }";
     html += "input[type=\"text\"], input[type=\"password\"], select { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-top: 4px; }";
@@ -302,10 +372,34 @@ String WebUI::generateHtmlPage() {
     html += "<button type=\"submit\" class=\"btn-save\">Einstellungen dauerhaft speichern</button>";
     html += "</form>";
 
+    // Firmware-Aktualisierung (Funk-Update / OTA)
+    html += "<div class=\"section-title\" style=\"margin-top:24px;\">Firmware-Aktualisierung (Funk-Update / OTA)</div>";
+    html += "<div style=\"font-size:12px;color:#666;margin-bottom:8px;\">";
+    html += "Aktuelle Version: <strong style=\"color:#0d6efd;\">v1.1.0</strong> &middot; Aktualisiert das Geraet direkt per WLAN ohne USB-Kabel.";
+    html += "</div>";
+
+    // Methode 1: GitHub Download
+    html += "<label for=\"ota_url\">Update-Quelle (GitHub Repository):</label>";
+    html += "<input type=\"text\" id=\"ota_url\" value=\"https://raw.githubusercontent.com/loe17/BonbridgeESP32/main/firmware.bin\" placeholder=\"URL zur firmware.bin\">";
+    html += "<button type=\"button\" id=\"btn-ota-github\" onclick=\"startGithubUpdate()\" class=\"btn-update\">📥 Firmware direkt von GitHub laden & installieren</button>";
+
+    // Methode 2: Manuelle Datei
+    html += "<div style=\"margin-top:14px;font-size:13px;font-weight:600;color:#444;\">Oder: Eigene Firmware-Datei (.bin) hochladen:</div>";
+    html += "<div class=\"file-input-wrapper\">";
+    html += "<input type=\"file\" id=\"ota_file\" accept=\".bin\" style=\"font-size:13px;flex:1;\">";
+    html += "<button type=\"button\" id=\"btn-ota-upload\" onclick=\"startFileUpload()\" class=\"btn-upload\">Upload & Flashen</button>";
+    html += "</div>";
+
+    // Fortschrittsbalken und Statusmeldung
+    html += "<div id=\"ota-progress-box\" class=\"progress-container\">";
+    html += "<div id=\"ota-progress-bar\" class=\"progress-bar\">0%</div>";
+    html += "</div>";
+    html += "<div id=\"ota-status-msg\" style=\"display:none;margin-top:8px;font-size:13px;font-weight:500;\"></div>";
+
     html += "<div class=\"footer\">BonbridgeESP32 &middot; 1 Drucker pro Adapter &middot; Port 9100 RAW</div>";
     html += "</div>";
 
-    // JavaScript für Suche, Netzauswahl und Live-Verbindungsstatus
+    // JavaScript für Suche, Netzauswahl, Live-Verbindung und OTA-Updates
     html += "<script>";
     html += "function togglePass(){var p=document.getElementById('pass');p.type=(p.type==='password')?'text':'password';}";
     html += "function scanWifi(){";
@@ -315,7 +409,7 @@ String WebUI::generateHtmlPage() {
     html += "btn.disabled=false;st.style.display='none';";
     html += "if(!nets||nets.length===0){list.innerHTML='<div style=\"padding:10px;color:#888;text-align:center;\">Keine WLAN-Netze gefunden</div>';list.style.display='block';return;}";
     html += "nets.sort(function(a,b){return b.signal-a.signal;});";
-    html += "var h='';for(var i=0;i<nets.size?nets.size():nets.length;i++){";
+    html += "var h='';for(var i=0;i<nets.length;i++){";
     html += "var n=nets[i];var lock=n.secure?'🔒':'🔓';";
     html += "h+='<div class=\"scan-item\" onclick=\"selectNet(\\''+encodeURIComponent(n.ssid)+'\\')\">';";
     html += "h+='<span class=\"scan-item-ssid\">'+escapeHtml(n.ssid)+'</span>';";
@@ -352,6 +446,60 @@ String WebUI::generateHtmlPage() {
     html += "fb.innerHTML='⚠️ <strong>Zeitueberschreitung</strong><br>Keine Rueckmeldung vom Router erhalten. Bitte pruefe den WLAN-Namen und das Passwort.';";
     html += "}";
     html += "}).catch(function(e){if(pollCount>=8){clearInterval(pollTimer);btn.disabled=false;fb.className='wifi-card wifi-card-success';fb.innerHTML='ℹ️ <strong>ESP hat sich verbunden!</strong><br>Die Verbindung zum Hotspot wurde beendet. Bitte schaue im WLAN-Router nach der vergebenen IP-Adresse.';}});";
+    html += "}";
+    html += "var otaTimer=null;";
+    html += "function startGithubUpdate(){";
+    html += "var url=document.getElementById('ota_url').value.trim();";
+    html += "if(!confirm('Moechtest du das Firmware-Update von GitHub jetzt starten?\\nDas Geraet startet nach dem Update automatisch neu.'))return;";
+    html += "var btnGh=document.getElementById('btn-ota-github');var btnUp=document.getElementById('btn-ota-upload');";
+    html += "btnGh.disabled=true;btnUp.disabled=true;";
+    html += "showOtaProgress(0,'⏳ Verbinde mit GitHub und starte Download...');";
+    html += "fetch('/api/ota/start',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'url='+encodeURIComponent(url)})";
+    html += ".then(function(r){return r.json();}).then(function(d){otaTimer=setInterval(pollOtaStatus,800);})";
+    html += ".catch(function(e){btnGh.disabled=false;btnUp.disabled=false;showOtaError('Verbindungsfehler zum ESP.');});";
+    html += "}";
+    html += "function startFileUpload(){";
+    html += "var fi=document.getElementById('ota_file');";
+    html += "if(!fi.files||fi.files.length===0){alert('Bitte waehle zuerst eine .bin Datei aus.');return;}";
+    html += "var file=fi.files[0];";
+    html += "if(!confirm('Soll die Datei \"'+file.name+'\" jetzt auf den Adapter installiert werden?'))return;";
+    html += "var btnGh=document.getElementById('btn-ota-github');var btnUp=document.getElementById('btn-ota-upload');";
+    html += "btnGh.disabled=true;btnUp.disabled=true;";
+    html += "showOtaProgress(0,'⏳ Lade Datei hoch (0%)...');";
+    html += "var fd=new FormData();fd.append('update',file);";
+    html += "var xhr=new XMLHttpRequest();xhr.open('POST','/api/ota/upload',true);";
+    html += "xhr.upload.onprogress=function(e){if(e.lengthComputable){var p=Math.round((e.loaded/e.total)*100);showOtaProgress(p,'⏳ Uebertrage Datei: '+p+'%');}};";
+    html += "xhr.onload=function(){if(xhr.status===200){showOtaSuccess('✅ Update erfolgreich! Der Adapter startet neu. Die Seite laedt in 12 Sekunden neu...');setTimeout(function(){location.reload();},12000);}else{btnGh.disabled=false;btnUp.disabled=false;showOtaError('❌ Fehler beim Installieren.');}};";
+    html += "xhr.onerror=function(){btnGh.disabled=false;btnUp.disabled=false;showOtaError('❌ Netzwerkfehler beim Upload.');};";
+    html += "xhr.send(fd);";
+    html += "}";
+    html += "function pollOtaStatus(){";
+    html += "fetch('/api/ota/status').then(function(r){return r.json();}).then(function(st){";
+    html += "var p=st.progress||0;";
+    html += "if(st.state==='downloading'||st.state==='starting'||st.state==='flashing'){";
+    html += "showOtaProgress(p,'⏳ '+(st.statusText||'Update laeuft...')+' ('+p+'%)');";
+    html += "}else if(st.state==='success'){";
+    html += "clearInterval(otaTimer);showOtaSuccess('✅ Update erfolgreich! Der Adapter startet neu. Seite laedt in 12 Sekunden neu...');setTimeout(function(){location.reload();},12000);";
+    html += "}else if(st.state==='error'){";
+    html += "clearInterval(otaTimer);document.getElementById('btn-ota-github').disabled=false;document.getElementById('btn-ota-upload').disabled=false;";
+    html += "showOtaError('❌ Update fehlgeschlagen: '+(st.error||'Unbekannter Fehler'));";
+    html += "}";
+    html += "}).catch(function(e){";
+    html += "var cur=parseInt(document.getElementById('ota-progress-bar').innerText)||0;";
+    html += "if(cur>=85){clearInterval(otaTimer);showOtaSuccess('✅ Firmware installiert! Der Adapter startet neu. Seite laedt in 10 Sekunden neu...');setTimeout(function(){location.reload();},10000);}";
+    html += "});";
+    html += "}";
+    html += "function showOtaProgress(p,m){";
+    html += "var b=document.getElementById('ota-progress-box');var bar=document.getElementById('ota-progress-bar');var msg=document.getElementById('ota-status-msg');";
+    html += "b.style.display='block';bar.style.width=p+'%';bar.innerText=p+'%';bar.style.background='#0d6efd';msg.style.display='block';msg.style.color='#055160';msg.innerHTML=m;";
+    html += "}";
+    html += "function showOtaSuccess(m){";
+    html += "var bar=document.getElementById('ota-progress-bar');var msg=document.getElementById('ota-status-msg');";
+    html += "bar.style.width='100%';bar.innerText='100%';bar.style.background='#198754';msg.style.color='#0f5132';msg.innerHTML=m;";
+    html += "}";
+    html += "function showOtaError(m){";
+    html += "var bar=document.getElementById('ota-progress-bar');var msg=document.getElementById('ota-status-msg');";
+    html += "bar.style.background='#dc3545';msg.style.color='#842029';msg.innerHTML=m;";
     html += "}";
     html += "</script>";
     html += "</body></html>";
