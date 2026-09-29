@@ -37,7 +37,7 @@ static void client_event_cb(const usb_host_client_event_msg_t *event_msg, void *
 static void usb_client_task(void *pvParameters) {
     UsbPrinter *printer = (UsbPrinter *)pvParameters;
     while (1) {
-        usb_host_client_handle_events(printer->instance().client_hdl, portMAX_DELAY);
+        usb_host_client_handle_events(printer->getClientHandle(), portMAX_DELAY);
     }
 }
 
@@ -77,7 +77,7 @@ bool UsbPrinter::begin() {
     xTaskCreatePinnedToCore(usb_host_lib_task, "usb_lib", 4096, NULL, 5, NULL, 0);
 
     const usb_host_client_config_t client_config = {
-        .is_async = false,
+        .is_synchronous = false,
         .max_num_event_msg = CLIENT_NUM_EVENT_MSG,
         .async = {
             .client_event_callback = client_event_cb,
@@ -137,7 +137,7 @@ void UsbPrinter::handleDeviceEvent(usb_host_client_event_msg_t* event_msg) {
                 } else if (desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_ENDPOINT) {
                     const usb_ep_desc_t *ep = (const usb_ep_desc_t *)desc;
                     if ((ep->bmAttributes & USB_BM_ATTRIBUTES_XFERTYPE_MASK) == USB_BM_ATTRIBUTES_XFER_BULK) {
-                        if ((ep->bEndpointAddress & USB_B_ENDPOINT_ADDRESS_DIRECTION_MASK) == USB_B_ENDPOINT_ADDRESS_DIR_OUT) {
+                        if ((ep->bEndpointAddress & 0x80) == 0) { // Bit 7 == 0: OUT Endpoint
                             bulkOutEp = ep->bEndpointAddress;
                             maxPacket = ep->wMaxPacketSize;
                         }

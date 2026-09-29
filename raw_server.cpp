@@ -19,8 +19,7 @@ RawServer& RawServer::instance() {
 
 bool RawServer::begin(uint16_t port) {
     listenPort = port;
-    server = WiFiServer(listenPort);
-    server.begin();
+    server.begin(listenPort);
     server.setNoDelay(true);
     ESP_LOGI(TAG, "RAW-Druckserver lauscht auf TCP-Port %d", listenPort);
     return true;

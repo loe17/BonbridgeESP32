@@ -73,7 +73,7 @@ void NetManager::initEthernet() {
 
     // Initialisierung des W5500 SPI Ethernet Treibers
     #if defined(ETH_PHY_W5500)
-    ETH.begin(ETH_PHY_W5500, 1, DEFAULT_ETH_CS, DEFAULT_ETH_INT, DEFAULT_ETH_RST, SPI2_HOST);
+    ETH.begin(ETH_PHY_W5500, 1, DEFAULT_ETH_CS, DEFAULT_ETH_INT, DEFAULT_ETH_RST, SPI);
     #else
     // Fallback falls Kern-Definition abweicht
     ETH.begin();

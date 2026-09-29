@@ -34,6 +34,7 @@ public:
     // Intern: Callback-Handler für den USB Host
     void handleDeviceEvent(usb_host_client_event_msg_t* event_msg);
     void setDeviceConnected(bool connected, const String& name, uint8_t outEp, uint16_t maxPacketSize, usb_device_handle_t devHandle);
+    usb_host_client_handle_t getClientHandle() const { return client_hdl; }
 
 private:
     UsbPrinter();

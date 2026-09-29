@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include <memory>
 
 class WebUI {
 public:
@@ -13,7 +14,7 @@ public:
 private:
     WebUI();
 
-    WebServer server;
+    std::unique_ptr<WebServer> server;
     String lastMessage;
     bool messageIsError;
 

@@ -8,7 +8,7 @@
 static const char* TAG = "WebUI";
 
 WebUI::WebUI() :
-    server(80),
+    server(nullptr),
     lastMessage(""),
     messageIsError(false)
 {
@@ -20,14 +20,14 @@ WebUI& WebUI::instance() {
 }
 
 bool WebUI::begin(uint16_t port) {
-    server = WebServer(port);
+    server.reset(new WebServer(port));
 
-    server.on("/", HTTP_GET, [this]() { handleRoot(); });
-    server.on("/action", HTTP_POST, [this]() { handleAction(); });
-    server.on("/save", HTTP_POST, [this]() { handleSave(); });
-    server.onNotFound([this]() { handleNotFound(); });
+    server->on("/", HTTP_GET, [this]() { handleRoot(); });
+    server->on("/action", HTTP_POST, [this]() { handleAction(); });
+    server->on("/save", HTTP_POST, [this]() { handleSave(); });
+    server->onNotFound([this]() { handleNotFound(); });
 
-    server.begin();
+    server->begin();
     ESP_LOGI(TAG, "Sparsame Web-Oberflaeche lauscht auf HTTP-Port %d", port);
     return true;
 }
@@ -35,17 +35,21 @@ bool WebUI::begin(uint16_t port) {
 void WebUI::update() {
     // Ruft ankommende Web-Anfragen ab. Wenn kein Browser zugreift, 
     // ist diese Funktion nahezu lastfrei (0% CPU).
-    server.handleClient();
+    if (server) {
+        server->handleClient();
+    }
 }
 
 void WebUI::handleRoot() {
+    if (!server) return;
     String html = generateHtmlPage();
-    server.send(200, "text/html; charset=UTF-8", html);
+    server->send(200, "text/html; charset=UTF-8", html);
     lastMessage = "";
 }
 
 void WebUI::handleAction() {
-    String cmd = server.arg("cmd");
+    if (!server) return;
+    String cmd = server->arg("cmd");
     if (cmd == "test_print") {
         if (UsbPrinter::instance().isConnected()) {
             AppConfig& conf = ConfigManager::instance().get();
@@ -74,26 +78,27 @@ void WebUI::handleAction() {
         messageIsError = true;
     }
 
-    server.sendHeader("Location", "/");
-    server.send(303);
+    server->sendHeader("Location", "/");
+    server->send(303);
 }
 
 void WebUI::handleSave() {
+    if (!server) return;
     AppConfig& conf = ConfigManager::instance().get();
 
-    if (server.hasArg("ssid")) {
-        conf.wifi_ssid = server.arg("ssid");
+    if (server->hasArg("ssid")) {
+        conf.wifi_ssid = server->arg("ssid");
     }
-    if (server.hasArg("pass")) {
-        String newPass = server.arg("pass");
+    if (server->hasArg("pass")) {
+        String newPass = server->arg("pass");
         if (newPass.length() > 0) {
             conf.wifi_password = newPass;
         }
     }
-    if (server.hasArg("profile")) {
-        conf.printer_profile = server.arg("profile").toInt();
+    if (server->hasArg("profile")) {
+        conf.printer_profile = server->arg("profile").toInt();
     }
-    conf.netwatch_enabled = server.hasArg("netwatch");
+    conf.netwatch_enabled = server->hasArg("netwatch");
 
     ConfigManager::instance().save();
     NetManager::instance().reloadWifiConfig();
@@ -101,12 +106,14 @@ void WebUI::handleSave() {
     lastMessage = "Einstellungen erfolgreich gespeichert!";
     messageIsError = false;
 
-    server.sendHeader("Location", "/");
-    server.send(303);
+    server->sendHeader("Location", "/");
+    server->send(303);
 }
 
 void WebUI::handleNotFound() {
-    server.send(404, "text/plain", "404 - Seite nicht gefunden");
+    if (server) {
+        server->send(404, "text/plain", "404 - Seite nicht gefunden");
+    }
 }
 
 String WebUI::generateHtmlPage() {
