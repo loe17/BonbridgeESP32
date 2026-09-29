@@ -9,26 +9,22 @@
 
 static const char* TAG = "Main";
 
-// Pin für die Status-LED (auf ESP32-S3 Super Mini meist GPIO 48 WS2812 RGB-LED)
-#ifndef STATUS_LED_PIN
-#ifdef RGB_BUILTIN
-#define STATUS_LED_PIN RGB_BUILTIN
-#elif defined(LED_BUILTIN)
-#define STATUS_LED_PIN LED_BUILTIN
-#else
-#define STATUS_LED_PIN 48
-#endif
-#endif
-
 static unsigned long lastHeartbeatMs = 0;
 static bool ledState = false;
 
 static void setStatusLed(bool on) {
-    digitalWrite(STATUS_LED_PIN, on ? HIGH : LOW);
-#ifdef RGB_BUILTIN
-    rgbLedWrite(RGB_BUILTIN, 0, on ? 32 : 0, on ? 16 : 0);
-#endif
-    rgbLedWrite(STATUS_LED_PIN, 0, on ? 32 : 0, on ? 16 : 0);
+    if (on) {
+        rgbLedWrite(48, 0, 255, 200); // Helles Cyan fuer WS2812 an GPIO 48
+    } else {
+        rgbLedWrite(48, 0, 0, 0);     // Aus
+    }
+
+    // Falls es eine normale LED ist (verschiedene Pins getestet)
+    digitalWrite(48, on ? HIGH : LOW);
+    digitalWrite(47, on ? HIGH : LOW);
+    digitalWrite(21, on ? HIGH : LOW);
+    digitalWrite(8, on ? HIGH : LOW);
+    digitalWrite(1, on ? HIGH : LOW);
 }
 
 void setup() {
@@ -40,11 +36,17 @@ void setup() {
         delay(10);
     }
 
-    pinMode(STATUS_LED_PIN, OUTPUT);
-    // Sofortiges optisches Lebenszeichen: 3x schnelles Aufblitzen
-    setStatusLed(true); delay(80); setStatusLed(false); delay(80);
-    setStatusLed(true); delay(80); setStatusLed(false); delay(80);
-    setStatusLed(true); delay(80); setStatusLed(false);
+    pinMode(48, OUTPUT);
+    pinMode(47, OUTPUT);
+    pinMode(21, OUTPUT);
+    pinMode(8, OUTPUT);
+    pinMode(1, OUTPUT);
+
+    // Deutliches Farbsignal beim Einschalten (Rot -> Gruen -> Blau)
+    rgbLedWrite(48, 255, 0, 0); delay(120);
+    rgbLedWrite(48, 0, 255, 0); delay(120);
+    rgbLedWrite(48, 0, 0, 255); delay(120);
+    setStatusLed(false);
 
     Serial.println();
     Serial.println("==================================================");

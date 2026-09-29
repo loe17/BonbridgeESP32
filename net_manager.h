@@ -28,6 +28,7 @@ public:
 
     // Ermöglicht es, die WLAN-Verbindung nach Speichern neuer Daten neu zu starten
     void reloadWifiConfig();
+    void onDisconnectEvent();
 
 private:
     NetManager();
@@ -38,6 +39,7 @@ private:
     unsigned long lastCheckMs;
     unsigned long wifiConnectStartMs;
     bool wifiAttemptActive;
+    uint8_t disconnectCount;
 
     void initEthernet();
     void startWifi();

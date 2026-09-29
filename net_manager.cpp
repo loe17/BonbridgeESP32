@@ -6,7 +6,22 @@ static const char* TAG = "NetManager";
 
 static NetManager* s_instance = nullptr;
 
-static void onWiFiEthEvent(WiFiEvent_t event) {
+static const char* getWifiReasonText(uint8_t reason) {
+    switch (reason) {
+        case 1:   return "UNSPECIFIED";
+        case 2:   return "AUTH_EXPIRE";
+        case 15:  return "4WAY_HANDSHAKE_TIMEOUT (Passwort pruefen!)";
+        case 200: return "BEACON_TIMEOUT (Signal zu schwach / außer Reichweite)";
+        case 201: return "NO_AP_FOUND (WLAN-Router nicht gefunden! Bitte 2.4 GHz pruefen)";
+        case 202: return "AUTH_FAIL (Passwort falsch oder WPA3/PMF Inkompatibilitaet)";
+        case 203: return "ASSOC_FAIL";
+        case 204: return "HANDSHAKE_TIMEOUT";
+        case 205: return "CONNECTION_FAIL";
+        default:  return "Verbindung fehlgeschlagen";
+    }
+}
+
+static void onWiFiEthEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
     switch (event) {
         case ARDUINO_EVENT_ETH_START:
             Serial.println("[NETZWERK] LAN-Treiber (W5500) gestartet.");
@@ -34,6 +49,9 @@ static void onWiFiEthEvent(WiFiEvent_t event) {
         case ARDUINO_EVENT_ETH_STOP:
             Serial.println("[NETZWERK] Ethernet gestoppt.");
             break;
+        case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+            Serial.println("[WLAN] Funkverbindung mit WLAN-Router hergestellt! Warte auf IP-Adresse...");
+            break;
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
             Serial.println();
             Serial.println("--------------------------------------------------");
@@ -46,9 +64,15 @@ static void onWiFiEthEvent(WiFiEvent_t event) {
             Serial.println("--------------------------------------------------");
             Serial.println();
             break;
-        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-            Serial.println("[WARNUNG] WLAN-Verbindung getrennt!");
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: {
+            uint8_t reason = info.wifi_sta_disconnected.reason;
+            Serial.printf("[WLAN-INFO] Verbindungsversuch fehlgeschlagen (Code %d: %s)\n",
+                          reason, getWifiReasonText(reason));
+            if (s_instance) {
+                s_instance->onDisconnectEvent();
+            }
             break;
+        }
         default:
             break;
     }
@@ -60,9 +84,14 @@ NetManager::NetManager() :
     wifiConnected(false),
     lastCheckMs(0),
     wifiConnectStartMs(0),
-    wifiAttemptActive(false)
+    wifiAttemptActive(false),
+    disconnectCount(0)
 {
     s_instance = this;
+}
+
+void NetManager::onDisconnectEvent() {
+    disconnectCount++;
 }
 
 NetManager& NetManager::instance() {
@@ -119,13 +148,15 @@ void NetManager::startWifi() {
         return; // Bereits verbunden
     }
 
-    Serial.print("[WLAN] Aktiviere WLAN und verbinde mit: ");
-    Serial.println(conf.wifi_ssid);
+    Serial.printf("[WLAN] Verbinde mit: '%s' (Passwort: %d Zeichen)\n", conf.wifi_ssid.c_str(), conf.wifi_password.length());
     WiFi.mode(WIFI_STA);
     WiFi.setHostname("BonbridgeESP32");
+    WiFi.setAutoReconnect(true);
+    WiFi.setTxPower(WIFI_POWER_15dBm);
     WiFi.begin(conf.wifi_ssid.c_str(), conf.wifi_password.c_str());
     wifiAttemptActive = true;
     wifiConnectStartMs = millis();
+    disconnectCount = 0;
 }
 
 void NetManager::stopWifi() {
@@ -147,6 +178,26 @@ void NetManager::reloadWifiConfig() {
 }
 
 void NetManager::checkConnections() {
+    // Wenn WLAN-Verbindung versucht wird, aber nach 12s oder 4 Fehlversuchen nicht klappt
+    if (wifiAttemptActive && !wifiConnected && !ethLinkUp) {
+        if ((millis() - wifiConnectStartMs > 12000) || disconnectCount >= 4) {
+            Serial.println();
+            Serial.println("==================================================");
+            Serial.println("[WLAN-HINWEIS] Verbindung zum WLAN-Router nicht moeglich.");
+            Serial.println("[WLAN-HOTSPOT] Eigener Einrichtungs-Hotspot wird zusaetzlich gestartet!");
+            Serial.println("  Name (SSID): Bonbridge-Setup");
+            Serial.println("  Passwort   : keines (offen)");
+            Serial.println("  Web-Menue  : http://192.168.4.1");
+            Serial.println("==================================================");
+            Serial.println();
+            WiFi.mode(WIFI_AP_STA);
+            WiFi.softAP("Bonbridge-Setup");
+            Serial.print("[WLAN-HOTSPOT] Hotspot IP: ");
+            Serial.println(WiFi.softAPIP());
+            wifiAttemptActive = false;
+        }
+    }
+
     // Prüfe Link-Status des W5500
     bool currentEthLink = ETH.linkUp();
 
