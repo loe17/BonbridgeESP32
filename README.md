@@ -28,8 +28,9 @@ Er nimmt Druckaufträge über ein **Netzwerkkabel (LAN)** oder über **WLAN** en
   * **Passwort einblenden (👁️):** Zeigt das eingegebene Passwort im Klartext an, um Tippfehler sofort zu vermeiden.
   * **Direkt verbinden mit Live-Rückmeldung:** Ein Klick auf *„Mit diesem WLAN verbinden“* stellt die Verbindung her und zeigt nach wenigen Sekunden die neue IP-Adresse als anklickbaren Link an – oder bei Fehlern (z. B. Passwort falsch) eine verständliche Erklärung.
   * **Automatischer Einrichtungs-Hotspot (`Bonbridge-Setup`):** Ist noch kein WLAN hinterlegt oder der Router nicht erreichbar, spannt der Adapter ein eigenes Hilfsnetzwerk auf (`Bonbridge-Setup` unter `http://192.168.4.1`). So kann man das WLAN kinderleicht direkt vom Smartphone oder Laptop einrichten!
-* **Drahtlose Firmware-Aktualisierung (Funk-Update / OTA):**
-  * **Direkt von GitHub:** Lädt mit einem Klick die neueste Firmware (`firmware.bin`) aus dem GitHub-Repository herunter und installiert sie.
+* **Drahtlose Firmware-Aktualisierung (Funk-Update / OTA) mit Versionsprüfung:**
+  * **🔍 Automatische Versionsprüfung:** Ein Klick auf *„Nach Versionen auf GitHub suchen“* prüft, ob eine neuere Version bereitsteht oder man bereits aktuell ist.
+  * **Auswahlmenü für Updates & Downgrades:** Zeigt alle jemals veröffentlichten Versionen an. Man kann mit einem Klick auf eine neuere Version aktualisieren oder bei Bedarf auf eine ältere Version zurückspringen (Downgrade).
   * **Manuelle Datei:** Ermöglicht das Hochladen einer eigenen `.bin`-Datei direkt über den Web-Browser.
   * **Live-Balken & Sicherheit:** Zeigt den Fortschritt von 0–100 % in Echtzeit an; alle gespeicherten WLAN- und Druckereinstellungen bleiben beim Update vollständig erhalten.
 * **Netzwerk-Wächter (Ausfall-Alarm):**
@@ -146,9 +147,14 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
    * Gib als Port **9100** ein.
    * Fertig! Ab sofort druckt deine Kasse zuverlässig über den Adapter.
 
-6. **Firmware drahtlos aktualisieren (Funk-Update / OTA):**
+6. **Firmware drahtlos aktualisieren & Downgrades durchführen (OTA):**
    * Rufe die Weboberfläche im Browser auf.
    * Scrolle nach unten zum Bereich **Firmware-Aktualisierung (Funk-Update / OTA)**.
-   * **Methode A (GitHub):** Klicke auf `📥 Firmware direkt von GitHub laden & installieren`. Der Adapter lädt die neueste Version verschlüsselt herunter, installiert sie und startet automatisch neu.
-   * **Methode B (Datei):** Wähle über `Datei auswählen` eine kompilierte `.bin`-Datei von deinem Computer aus und klicke auf `Upload & Flashen`.
-   * Während des Vorgangs siehst du einen Echtzeit-Ladebalken. Alle gespeicherten WLAN- und Druckeinstellungen bleiben vollständig erhalten.
+   * **Versionen prüfen:** Klicke auf `🔍 Nach Versionen auf GitHub suchen`.
+   * **Auswählen & Installieren:**
+     * Es erscheint eine Liste aller freigegebenen Versionen aus dem GitHub-Projekt.
+     * Wähle eine **neuere Version** aus, um das System zu aktualisieren.
+     * Wähle eine **ältere Version** aus, falls du auf einen vorherigen Softwarestand zurückspringen möchtest (Downgrade).
+     * Der Knopf passt sich automatisch an (z. B. `Auf v1.2.0 aktualisieren` oder `Auf v1.0.0 zurückstufen (Downgrade)`).
+   * **Manuelle Datei:** Über `Datei auswählen` kannst du weiterhin jederzeit eine eigene `.bin`-Datei vom Computer hochladen.
+   * Während der Übertragung siehst du einen Echtzeit-Ladebalken. Alle gespeicherten WLAN- und Druckeinstellungen bleiben vollständig erhalten.

@@ -207,6 +207,7 @@ void WebUI::handleOtaStatus() {
 
     String json = "{";
     json += "\"state\":\"" + stStr + "\",";
+    json += "\"version\":\"" + String(OtaUpdater::getVersion()) + "\",";
     json += "\"progress\":" + String(OtaUpdater::instance().getProgress()) + ",";
     json += "\"statusText\":\"" + OtaUpdater::instance().getStatusString() + "\",";
     json += "\"error\":\"" + OtaUpdater::instance().getErrorMessage() + "\"";
@@ -256,7 +257,7 @@ String WebUI::generateHtmlPage() {
     }
 
     String html;
-    html.reserve(10240);
+    html.reserve(20480);
 
     html += "<!DOCTYPE html><html lang=\"de\"><head>";
     html += "<meta charset=\"UTF-8\">";
@@ -374,20 +375,37 @@ String WebUI::generateHtmlPage() {
 
     // Firmware-Aktualisierung (Funk-Update / OTA)
     html += "<div class=\"section-title\" style=\"margin-top:24px;\">Firmware-Aktualisierung (Funk-Update / OTA)</div>";
-    html += "<div style=\"font-size:12px;color:#666;margin-bottom:8px;\">";
-    html += "Aktuelle Version: <strong style=\"color:#0d6efd;\">v1.1.0</strong> &middot; Aktualisiert das Geraet direkt per WLAN ohne USB-Kabel.";
+    html += "<div style=\"font-size:12px;color:#666;margin-bottom:12px;\">";
+    html += "Installierte Version: <strong style=\"color:#0d6efd;font-size:13px;\">" + String(OtaUpdater::getVersion()) + "</strong> &middot; Aktualisiert das Geraet direkt per WLAN ohne USB-Kabel.";
     html += "</div>";
 
-    // Methode 1: GitHub Download
-    html += "<label for=\"ota_url\">Update-Quelle (GitHub Repository):</label>";
-    html += "<input type=\"text\" id=\"ota_url\" value=\"https://raw.githubusercontent.com/loe17/BonbridgeESP32/main/firmware.bin\" placeholder=\"URL zur firmware.bin\">";
-    html += "<button type=\"button\" id=\"btn-ota-github\" onclick=\"startGithubUpdate()\" class=\"btn-update\">📥 Firmware direkt von GitHub laden & installieren</button>";
+    // Automatische Versionsprüfung
+    html += "<button type=\"button\" id=\"btn-check-versions\" onclick=\"checkGithubVersions()\" class=\"btn-scan\" style=\"width:100%;padding:10px;font-size:14px;\">🔍 Nach Versionen auf GitHub suchen</button>";
+    html += "<div id=\"version-check-status\" style=\"display:none;margin-top:10px;\" class=\"wifi-card\"></div>";
 
-    // Methode 2: Manuelle Datei
-    html += "<div style=\"margin-top:14px;font-size:13px;font-weight:600;color:#444;\">Oder: Eigene Firmware-Datei (.bin) hochladen:</div>";
+    // Auswahlliste für gefundene Versionen
+    html += "<div id=\"version-select-box\" style=\"display:none;margin-top:12px;\">";
+    html += "<label for=\"version-dropdown\">Verfuegbare Version zum Installieren oder Zurueckstufen (Downgrade):</label>";
+    html += "<select id=\"version-dropdown\" onchange=\"onVersionSelected()\" style=\"margin-top:4px;font-size:14px;padding:8px;\"></select>";
+    html += "<button type=\"button\" id=\"btn-install-selected\" onclick=\"installSelectedVersion()\" class=\"btn-update\">Auf ausgewaehlte Version aktualisieren</button>";
+    html += "</div>";
+
+    // Erweiterte Option: Benutzerdefinierte URL
+    html += "<details style=\"margin-top:14px;font-size:12px;color:#666;\">";
+    html += "<summary style=\"cursor:pointer;font-weight:600;\">Erweiterte Option: Benutzerdefinierte URL eingeben...</summary>";
+    html += "<div style=\"margin-top:8px;\">";
+    html += "<input type=\"text\" id=\"ota_url\" value=\"https://raw.githubusercontent.com/loe17/BonbridgeESP32/main/firmware.bin\" placeholder=\"URL zur firmware.bin\">";
+    html += "<button type=\"button\" id=\"btn-ota-github\" onclick=\"startCustomUrlUpdate()\" class=\"btn-update\" style=\"background:#6c757d;margin-top:6px;\">URL herunterladen & installieren</button>";
+    html += "</div>";
+    html += "</details>";
+
+    // Manuelle Datei hochladen
+    html += "<div style=\"margin-top:16px;padding-top:14px;border-top:1px solid #eee;\">";
+    html += "<div style=\"font-size:13px;font-weight:600;color:#444;\">Oder: Eigene Firmware-Datei (.bin) hochladen:</div>";
     html += "<div class=\"file-input-wrapper\">";
     html += "<input type=\"file\" id=\"ota_file\" accept=\".bin\" style=\"font-size:13px;flex:1;\">";
     html += "<button type=\"button\" id=\"btn-ota-upload\" onclick=\"startFileUpload()\" class=\"btn-upload\">Upload & Flashen</button>";
+    html += "</div>";
     html += "</div>";
 
     // Fortschrittsbalken und Statusmeldung
@@ -401,6 +419,8 @@ String WebUI::generateHtmlPage() {
 
     // JavaScript für Suche, Netzauswahl, Live-Verbindung und OTA-Updates
     html += "<script>";
+    html += "var currentVer='" + String(OtaUpdater::getVersion()) + "';";
+    html += "var fetchedVersions=[];";
     html += "function togglePass(){var p=document.getElementById('pass');p.type=(p.type==='password')?'text':'password';}";
     html += "function scanWifi(){";
     html += "var btn=document.getElementById('btn-scan');var st=document.getElementById('scan-status');var list=document.getElementById('scan-list');";
@@ -447,32 +467,116 @@ String WebUI::generateHtmlPage() {
     html += "}";
     html += "}).catch(function(e){if(pollCount>=8){clearInterval(pollTimer);btn.disabled=false;fb.className='wifi-card wifi-card-success';fb.innerHTML='ℹ️ <strong>ESP hat sich verbunden!</strong><br>Die Verbindung zum Hotspot wurde beendet. Bitte schaue im WLAN-Router nach der vergebenen IP-Adresse.';}});";
     html += "}";
-    html += "var otaTimer=null;";
-    html += "function startGithubUpdate(){";
-    html += "var url=document.getElementById('ota_url').value.trim();";
-    html += "if(!confirm('Moechtest du das Firmware-Update von GitHub jetzt starten?\\nDas Geraet startet nach dem Update automatisch neu.'))return;";
-    html += "var btnGh=document.getElementById('btn-ota-github');var btnUp=document.getElementById('btn-ota-upload');";
-    html += "btnGh.disabled=true;btnUp.disabled=true;";
-    html += "showOtaProgress(0,'⏳ Verbinde mit GitHub und starte Download...');";
-    html += "fetch('/api/ota/start',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'url='+encodeURIComponent(url)})";
-    html += ".then(function(r){return r.json();}).then(function(d){otaTimer=setInterval(pollOtaStatus,800);})";
-    html += ".catch(function(e){btnGh.disabled=false;btnUp.disabled=false;showOtaError('Verbindungsfehler zum ESP.');});";
+
+    // Versions-Vergleich & Downgrade Logik
+    html += "function compareSemVer(a,b){";
+    html += "var pA=a.replace(/^v/i,'').split('.').map(function(x){return parseInt(x)||0;});";
+    html += "var pB=b.replace(/^v/i,'').split('.').map(function(x){return parseInt(x)||0;});";
+    html += "for(var i=0;i<Math.max(pA.length,pB.length);i++){var nA=pA[i]||0;var nB=pB[i]||0;if(nA>nB)return 1;if(nA<nB)return -1;}return 0;";
     html += "}";
+
+    html += "function checkGithubVersions(){";
+    html += "var btn=document.getElementById('btn-check-versions');var st=document.getElementById('version-check-status');var selBox=document.getElementById('version-select-box');";
+    html += "btn.disabled=true;st.style.display='block';st.className='wifi-card wifi-card-info';st.innerHTML='⏳ Frage Versionen von GitHub ab...';selBox.style.display='none';";
+    html += "fetch('https://api.github.com/repos/loe17/BonbridgeESP32/releases').then(function(r){";
+    html += "if(r.ok)return r.json();throw new Error('Releases Status '+r.status);";
+    html += "}).then(function(rels){";
+    html += "fetchedVersions=[];";
+    html += "if(Array.isArray(rels)&&rels.length>0){";
+    html += "for(var i=0;i<rels.length;i++){";
+    html += "var r=rels[i];var tag=r.tag_name||r.name;var url='';";
+    html += "if(r.assets&&r.assets.length>0){for(var a=0;a<r.assets.length;a++){if(r.assets[a].name.endsWith('.bin')){url=r.assets[a].browser_download_url;break;}}}";
+    html += "if(!url)url='https://github.com/loe17/BonbridgeESP32/releases/download/'+tag+'/firmware.bin';";
+    html += "fetchedVersions.push({tag:tag,name:r.name||tag,url:url});";
+    html += "}}";
+    html += "if(fetchedVersions.length===0)fetchTagsFallback();else renderVersionsList();";
+    html += "}).catch(function(e){fetchTagsFallback();});";
+    html += "}";
+
+    html += "function fetchTagsFallback(){";
+    html += "fetch('https://api.github.com/repos/loe17/BonbridgeESP32/tags').then(function(r){";
+    html += "if(r.ok)return r.json();throw new Error('Tags Status '+r.status);";
+    html += "}).then(function(tags){";
+    html += "fetchedVersions=[];";
+    html += "if(Array.isArray(tags)&&tags.length>0){for(var i=0;i<tags.length;i++){var t=tags[i].name;var u='https://raw.githubusercontent.com/loe17/BonbridgeESP32/'+t+'/firmware.bin';fetchedVersions.push({tag:t,name:t,url:u});}}";
+    html += "if(fetchedVersions.length===0)fetchedVersions.push({tag:'main',name:'Neuester Stand (main Branch)',url:'https://raw.githubusercontent.com/loe17/BonbridgeESP32/main/firmware.bin'});";
+    html += "renderVersionsList();";
+    html += "}).catch(function(e){";
+    html += "var btn=document.getElementById('btn-check-versions');btn.disabled=false;";
+    html += "fetchedVersions=[{tag:'main',name:'Neuester Stand (main Branch)',url:'https://raw.githubusercontent.com/loe17/BonbridgeESP32/main/firmware.bin'}];";
+    html += "renderVersionsList();";
+    html += "});";
+    html += "}";
+
+    html += "function renderVersionsList(){";
+    html += "var btn=document.getElementById('btn-check-versions');var st=document.getElementById('version-check-status');";
+    html += "var selBox=document.getElementById('version-select-box');var dd=document.getElementById('version-dropdown');";
+    html += "btn.disabled=false;";
+    html += "fetchedVersions.sort(function(a,b){return compareSemVer(b.tag,a.tag);});";
+    html += "var newest=fetchedVersions[0];var cmpNewest=compareSemVer(newest.tag,currentVer);";
+    html += "if(cmpNewest>0){st.className='wifi-card wifi-card-success';st.innerHTML='🎉 <strong>Neue Version verfuegbar: '+escapeHtml(newest.tag)+'</strong><br>Aktuell installiert: <strong>'+escapeHtml(currentVer)+'</strong>';}";
+    html += "else if(cmpNewest===0){st.className='wifi-card wifi-card-info';st.innerHTML='✅ <strong>Du nutzt bereits die aktuellste Version ('+escapeHtml(currentVer)+')</strong>';}";
+    html += "else{st.className='wifi-card wifi-card-info';st.innerHTML='ℹ️ Installierte Version: <strong>'+escapeHtml(currentVer)+'</strong>';}";
+    html += "dd.innerHTML='';";
+    html += "for(var i=0;i<fetchedVersions.length;i++){";
+    html += "var v=fetchedVersions[i];var cmp=compareSemVer(v.tag,currentVer);var lbl=v.tag;";
+    html += "if(v.name&&v.name!==v.tag)lbl+=' - '+v.name;";
+    html += "if(cmp>0)lbl+=' (Neuere Version)';else if(cmp===0)lbl+=' (Aktuell installiert)';else lbl+=' (Aeltere Version - Downgrade)';";
+    html += "var opt=document.createElement('option');opt.value=i;opt.text=lbl;dd.appendChild(opt);";
+    html += "}";
+    html += "selBox.style.display='block';onVersionSelected();";
+    html += "}";
+
+    html += "function onVersionSelected(){";
+    html += "var dd=document.getElementById('version-dropdown');var idx=parseInt(dd.value)||0;var v=fetchedVersions[idx];if(!v)return;";
+    html += "var btn=document.getElementById('btn-install-selected');var cmp=compareSemVer(v.tag,currentVer);";
+    html += "if(cmp>0){btn.innerText='🚀 Auf '+v.tag+' aktualisieren';btn.style.background='#198754';}";
+    html += "else if(cmp<0){btn.innerText='⚠️ Auf '+v.tag+' zurueckstufen (Downgrade)';btn.style.background='#dc3545';}";
+    html += "else{btn.innerText='🔄 '+v.tag+' erneut installieren';btn.style.background='#0d6efd';}";
+    html += "}";
+
+    html += "function installSelectedVersion(){";
+    html += "var dd=document.getElementById('version-dropdown');var idx=parseInt(dd.value)||0;var v=fetchedVersions[idx];if(!v)return;";
+    html += "var cmp=compareSemVer(v.tag,currentVer);var msg='';";
+    html += "if(cmp>0)msg='Moechtest du das Firmware-Update auf '+v.tag+' jetzt starten?\\nDas Geraet startet nach der Installation automatisch neu.';";
+    html += "else if(cmp<0)msg='ACHTUNG: Du installierst eine AELTERE Version ('+v.tag+' - Downgrade)!\\nMoechtest du wirklich fortfahren?';";
+    html += "else msg='Moechtest du die Version '+v.tag+' erneut installieren?';";
+    html += "if(!confirm(msg))return;";
+    html += "startOtaWithUrl(v.url,'⏳ Installiere '+v.tag+' von GitHub...');";
+    html += "}";
+
+    html += "function startCustomUrlUpdate(){";
+    html += "var u=document.getElementById('ota_url').value.trim();if(!u){alert('Bitte eine gueltige URL eingeben.');return;}";
+    html += "if(!confirm('Moechtest du die Firmware von dieser URL installieren?\\n'+u))return;";
+    html += "startOtaWithUrl(u,'⏳ Lade Firmware von URL...');";
+    html += "}";
+
+    html += "var otaTimer=null;";
+    html += "function startOtaWithUrl(targetUrl,startMsg){";
+    html += "var bCheck=document.getElementById('btn-check-versions');var bInst=document.getElementById('btn-install-selected');var bUp=document.getElementById('btn-ota-upload');";
+    html += "if(bCheck)bCheck.disabled=true;if(bInst)bInst.disabled=true;if(bUp)bUp.disabled=true;";
+    html += "showOtaProgress(0,startMsg);";
+    html += "fetch('/api/ota/start',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'url='+encodeURIComponent(targetUrl)})";
+    html += ".then(function(r){return r.json();}).then(function(d){otaTimer=setInterval(pollOtaStatus,800);})";
+    html += ".catch(function(e){if(bCheck)bCheck.disabled=false;if(bInst)bInst.disabled=false;if(bUp)bUp.disabled=false;showOtaError('Verbindungsfehler zum ESP.');});";
+    html += "}";
+
     html += "function startFileUpload(){";
     html += "var fi=document.getElementById('ota_file');";
     html += "if(!fi.files||fi.files.length===0){alert('Bitte waehle zuerst eine .bin Datei aus.');return;}";
     html += "var file=fi.files[0];";
     html += "if(!confirm('Soll die Datei \"'+file.name+'\" jetzt auf den Adapter installiert werden?'))return;";
-    html += "var btnGh=document.getElementById('btn-ota-github');var btnUp=document.getElementById('btn-ota-upload');";
-    html += "btnGh.disabled=true;btnUp.disabled=true;";
+    html += "var bCheck=document.getElementById('btn-check-versions');var bInst=document.getElementById('btn-install-selected');var bUp=document.getElementById('btn-ota-upload');";
+    html += "if(bCheck)bCheck.disabled=true;if(bInst)bInst.disabled=true;if(bUp)bUp.disabled=true;";
     html += "showOtaProgress(0,'⏳ Lade Datei hoch (0%)...');";
     html += "var fd=new FormData();fd.append('update',file);";
     html += "var xhr=new XMLHttpRequest();xhr.open('POST','/api/ota/upload',true);";
     html += "xhr.upload.onprogress=function(e){if(e.lengthComputable){var p=Math.round((e.loaded/e.total)*100);showOtaProgress(p,'⏳ Uebertrage Datei: '+p+'%');}};";
-    html += "xhr.onload=function(){if(xhr.status===200){showOtaSuccess('✅ Update erfolgreich! Der Adapter startet neu. Die Seite laedt in 12 Sekunden neu...');setTimeout(function(){location.reload();},12000);}else{btnGh.disabled=false;btnUp.disabled=false;showOtaError('❌ Fehler beim Installieren.');}};";
-    html += "xhr.onerror=function(){btnGh.disabled=false;btnUp.disabled=false;showOtaError('❌ Netzwerkfehler beim Upload.');};";
+    html += "xhr.onload=function(){if(xhr.status===200){showOtaSuccess('✅ Update erfolgreich! Der Adapter startet neu. Die Seite laedt in 12 Sekunden neu...');setTimeout(function(){location.reload();},12000);}else{if(bCheck)bCheck.disabled=false;if(bInst)bInst.disabled=false;if(bUp)bUp.disabled=false;showOtaError('❌ Fehler beim Installieren.');}};";
+    html += "xhr.onerror=function(){if(bCheck)bCheck.disabled=false;if(bInst)bInst.disabled=false;if(bUp)bUp.disabled=false;showOtaError('❌ Netzwerkfehler beim Upload.');};";
     html += "xhr.send(fd);";
     html += "}";
+
     html += "function pollOtaStatus(){";
     html += "fetch('/api/ota/status').then(function(r){return r.json();}).then(function(st){";
     html += "var p=st.progress||0;";
@@ -481,7 +585,9 @@ String WebUI::generateHtmlPage() {
     html += "}else if(st.state==='success'){";
     html += "clearInterval(otaTimer);showOtaSuccess('✅ Update erfolgreich! Der Adapter startet neu. Seite laedt in 12 Sekunden neu...');setTimeout(function(){location.reload();},12000);";
     html += "}else if(st.state==='error'){";
-    html += "clearInterval(otaTimer);document.getElementById('btn-ota-github').disabled=false;document.getElementById('btn-ota-upload').disabled=false;";
+    html += "clearInterval(otaTimer);";
+    html += "var bCheck=document.getElementById('btn-check-versions');var bInst=document.getElementById('btn-install-selected');var bUp=document.getElementById('btn-ota-upload');";
+    html += "if(bCheck)bCheck.disabled=false;if(bInst)bInst.disabled=false;if(bUp)bUp.disabled=false;";
     html += "showOtaError('❌ Update fehlgeschlagen: '+(st.error||'Unbekannter Fehler'));";
     html += "}";
     html += "}).catch(function(e){";
@@ -489,6 +595,7 @@ String WebUI::generateHtmlPage() {
     html += "if(cur>=85){clearInterval(otaTimer);showOtaSuccess('✅ Firmware installiert! Der Adapter startet neu. Seite laedt in 10 Sekunden neu...');setTimeout(function(){location.reload();},10000);}";
     html += "});";
     html += "}";
+
     html += "function showOtaProgress(p,m){";
     html += "var b=document.getElementById('ota-progress-box');var bar=document.getElementById('ota-progress-bar');var msg=document.getElementById('ota-status-msg');";
     html += "b.style.display='block';bar.style.width=p+'%';bar.innerText=p+'%';bar.style.background='#0d6efd';msg.style.display='block';msg.style.color='#055160';msg.innerHTML=m;";

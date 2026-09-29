@@ -11,9 +11,12 @@ enum OtaState {
     OTA_STATE_ERROR = 5
 };
 
+#define BONBRIDGE_FIRMWARE_VERSION "v1.1.0"
+
 class OtaUpdater {
 public:
     static OtaUpdater& instance();
+    static const char* getVersion() { return BONBRIDGE_FIRMWARE_VERSION; }
 
     // Startet das Online-Update von der angegebenen URL (z.B. GitHub Raw oder Releases)
     bool startHttpUpdate(const String& url = "");
