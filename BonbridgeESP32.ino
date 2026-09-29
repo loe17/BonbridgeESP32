@@ -9,9 +9,11 @@
 
 static const char* TAG = "Main";
 
-// Pin für die Status-LED (auf vielen ESP32-S3 Super Mini Boards GPIO 48, 47 oder 21)
+// Pin für die Status-LED (auf ESP32-S3 Super Mini meist GPIO 48 WS2812 RGB-LED)
 #ifndef STATUS_LED_PIN
-#ifdef LED_BUILTIN
+#ifdef RGB_BUILTIN
+#define STATUS_LED_PIN RGB_BUILTIN
+#elif defined(LED_BUILTIN)
 #define STATUS_LED_PIN LED_BUILTIN
 #else
 #define STATUS_LED_PIN 48
@@ -21,17 +23,28 @@ static const char* TAG = "Main";
 static unsigned long lastHeartbeatMs = 0;
 static bool ledState = false;
 
+static void setStatusLed(bool on) {
+    digitalWrite(STATUS_LED_PIN, on ? HIGH : LOW);
+#ifdef RGB_BUILTIN
+    rgbLedWrite(RGB_BUILTIN, 0, on ? 32 : 0, on ? 16 : 0);
+#endif
+    rgbLedWrite(STATUS_LED_PIN, 0, on ? 32 : 0, on ? 16 : 0);
+}
+
 void setup() {
     Serial.begin(115200);
 
-    // Bis zu 1,5 Sekunden warten, falls der USB-Serielle-Monitor verbunden wird
+    // Bis zu 2 Sekunden warten, falls der USB-Serielle-Monitor verbunden wird
     unsigned long startWait = millis();
-    while (!Serial && (millis() - startWait < 1500)) {
+    while (!Serial && (millis() - startWait < 2000)) {
         delay(10);
     }
 
     pinMode(STATUS_LED_PIN, OUTPUT);
-    digitalWrite(STATUS_LED_PIN, LOW);
+    // Sofortiges optisches Lebenszeichen: 3x schnelles Aufblitzen
+    setStatusLed(true); delay(80); setStatusLed(false); delay(80);
+    setStatusLed(true); delay(80); setStatusLed(false); delay(80);
+    setStatusLed(true); delay(80); setStatusLed(false);
 
     Serial.println();
     Serial.println("==================================================");
@@ -43,26 +56,24 @@ void setup() {
     ConfigManager::instance().begin();
     AppConfig& conf = ConfigManager::instance().get();
 
-    Serial.println("[START] Starte USB-Host fuer Bondrucker...");
-    // 2. USB-Host für ESC/POS Bondrucker starten
-    if (!UsbPrinter::instance().begin()) {
-        Serial.println("[FEHLER] Konnte USB-Host nicht initialisieren!");
-    }
-
     Serial.println("[START] Initialisiere Netzwerk (LAN & WLAN)...");
-    // 3. Netzwerk-Steuerung starten (W5500 LAN hat Vorrang, WLAN als Ersatz)
+    // 2. Netzwerk-Steuerung starten (W5500 LAN hat Vorrang, WLAN als Ersatz)
     NetManager::instance().begin();
 
-    // 4. Port 9100 RAW Server starten (Nimmt Druckdaten vom Kassensystem an)
+    // 3. Port 9100 RAW Server starten (Nimmt Druckdaten vom Kassensystem an)
     RawServer::instance().begin(conf.port9100);
 
-    // 5. Sparsame Web-Oberfläche starten
+    // 4. Sparsame Web-Oberfläche starten
     WebUI::instance().begin(80);
 
-    // 6. Netzwerk-Wächter aktivieren
+    // 5. Netzwerk-Wächter aktivieren
     NetWatch::instance().begin();
 
-    Serial.println("[START] System bereit. Warte auf Netzwerk und Drucker...");
+    // 6. USB-Host für ESC/POS Bondrucker (nach Netzwerk starten)
+    Serial.println("[START] Initialisiere USB-Schnittstelle...");
+    UsbPrinter::instance().begin();
+
+    Serial.println("[START] System betriebsbereit.");
     Serial.println("==================================================");
     Serial.println();
 }
@@ -73,19 +84,22 @@ void loop() {
     if (now - lastHeartbeatMs >= 1000) {
         lastHeartbeatMs = now;
         ledState = !ledState;
-        digitalWrite(STATUS_LED_PIN, ledState ? HIGH : LOW);
+        setStatusLed(ledState);
     }
 
     // 2. Netzwerk-Verbindung überwachen & umschalten
     NetManager::instance().update();
 
-    // 3. Port 9100 Daten-Tunnel verarbeiten (direktes Streaming an USB)
+    // 3. USB-Drucker Status überwachen
+    UsbPrinter::instance().update();
+
+    // 4. Port 9100 Daten-Tunnel verarbeiten (direktes Streaming an USB)
     RawServer::instance().update();
 
-    // 4. Web-Oberfläche abfragen (0% CPU bei Inaktivität)
+    // 5. Web-Oberfläche abfragen (0% CPU bei Inaktivität)
     WebUI::instance().update();
 
-    // 5. Auf Ausfall des Netzwerks prüfen
+    // 6. Auf Ausfall des Netzwerks prüfen
     NetWatch::instance().update();
 
     // Kurzer Yield für FreeRTOS

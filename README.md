@@ -82,9 +82,12 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 3. Wähle im Ordner `BonbridgeESP32` die Datei **`BonbridgeESP32.ino`** aus.
 4. Alle Programmteile öffnen sich nun automatisch als übersichtliche Reiter (Tabs).
 5. Wähle unter **Werkzeuge -> Board -> esp32** dein Board aus: **ESP32S3 Dev Module**.
-6. Stelle unter **Werkzeuge** sicher:
+6. Stelle unter **Werkzeuge** folgende Werte ein:
    * **USB Mode:** *Hardware CDC and JTAG*
-   * **USB CDC On Boot:** *Enabled*
+   * **USB CDC On Boot:** *Enabled* (Wichtig: Nur so sendet der Chip Text an den PC-Monitor!)
+   * **PSRAM:** *Disabled* (Sehr wichtig: Verhindert Start-Absturzschleifen bei Super Mini Boards!)
+   * **Flash Size:** *4MB* (oder *8MB*)
+   * **Flash Mode:** *QIO 80MHz*
 7. Verbinde den ESP32-S3 per USB-Kabel mit dem Computer, wähle den passenden **Port** aus und klicke auf den Pfeil (**Hochladen**).
 
 ### Mit PlatformIO (VS Code):
@@ -96,9 +99,9 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 ## Erste Schritte & Bedienung
 
 1. **Einschalten & Status-LED (Lebenszeichen):**
-   * Nach dem Anstecken an den Strom startet der Adapter in weniger als 2 Sekunden.
-   * **Hinweis zur LED:** Auf vielen ESP32-S3 Mini-Boards geht die kleine rote Ladeleuchte nach wenigen Sekunden aus. Das ist völlig normal, da kein Akku angeschlossen ist!
-   * **Herzschlag:** Die blaue Status-LED auf dem Board schaltet im ruhigen Sekundentakt um. Solange sie gleichmäßig blinkt, läuft das Gerät einwandfrei.
+   * Nach dem Anstecken an den Strom blitzt die LED 3x kurz auf als Startsignal.
+   * Danach schaltet sie im ruhigen Sekundentakt um („Herzschlag“). Solange sie gleichmäßig blinkt, läuft das Gerät einwandfrei.
+   * **Hinweis zur Lade-LED:** Auf dem Board befindet sich auch eine kleine rote Ladeleuchte. Diese erlischt nach wenigen Sekunden, weil kein Akku angeschlossen ist – das ist völlig normal!
 
 2. **IP-Adresse sofort ablesen (Serieller Monitor):**
    * Öffne in der Arduino IDE oben rechts die Lupe (**Serieller Monitor**).

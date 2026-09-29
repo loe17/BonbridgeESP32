@@ -102,9 +102,16 @@ void NetManager::initEthernet() {
 void NetManager::startWifi() {
     AppConfig& conf = ConfigManager::instance().get();
     if (conf.wifi_ssid.length() == 0) {
-        Serial.println("[NETZWERK] Kein LAN-Kabel gesteckt und keine WLAN-Zugangsdaten im Speicher.");
-        Serial.println("[HINWEIS] Bitte LAN-Kabel einstecken oder WLAN-Daten im Web-Menue eintragen.");
-        stopWifi();
+        Serial.println("[NETZWERK] Kein LAN-Kabel gesteckt und keine WLAN-Daten im Speicher.");
+        Serial.println("[WLAN-HOTSPOT] Starte Einrichtungs-Hotspot: 'Bonbridge-Setup'");
+        WiFi.mode(WIFI_AP);
+        WiFi.softAP("Bonbridge-Setup");
+        Serial.print("[WLAN-HOTSPOT] Hotspot IP-Adresse: ");
+        Serial.println(WiFi.softAPIP());
+        Serial.println("[WLAN-HOTSPOT] Verbinde dich mit 'Bonbridge-Setup' und oeffne http://192.168.4.1 im Browser.");
+        wifiAttemptActive = false;
+        wifiConnected = false;
+        currentMode = NET_MODE_WIFI;
         return;
     }
 
@@ -125,6 +132,7 @@ void NetManager::stopWifi() {
     if (WiFi.getMode() != WIFI_OFF) {
         Serial.println("[WLAN] Deaktiviere WLAN-Modul (Kabelverbindung aktiv).");
         WiFi.disconnect(true);
+        WiFi.softAPdisconnect(true);
         WiFi.mode(WIFI_OFF);
         wifiAttemptActive = false;
         wifiConnected = false;
@@ -187,6 +195,9 @@ String NetManager::getActiveDescription() {
         case NET_MODE_ETHERNET:
             return "LAN-Kabel aktiv (WLAN ist aus)";
         case NET_MODE_WIFI: {
+            if (WiFi.getMode() == WIFI_AP) {
+                return "Einrichtungs-Hotspot aktiv ('Bonbridge-Setup')";
+            }
             int rssi = WiFi.RSSI();
             return "WLAN aktiv (" + WiFi.SSID() + ", Signal: " + String(rssi) + " dBm)";
         }
@@ -203,6 +214,9 @@ String NetManager::getIpAddress() {
     if (currentMode == NET_MODE_ETHERNET) {
         return ETH.localIP().toString();
     } else if (currentMode == NET_MODE_WIFI) {
+        if (WiFi.getMode() == WIFI_AP) {
+            return WiFi.softAPIP().toString();
+        }
         return WiFi.localIP().toString();
     }
     return "0.0.0.0 (Nicht verbunden)";
@@ -219,8 +233,11 @@ bool NetManager::isOnline() {
     if (currentMode == NET_MODE_ETHERNET && ETH.linkUp()) {
         return ETH.localIP() != IPAddress(0, 0, 0, 0);
     }
-    if (currentMode == NET_MODE_WIFI && WiFi.status() == WL_CONNECTED) {
-        return WiFi.localIP() != IPAddress(0, 0, 0, 0);
+    if (currentMode == NET_MODE_WIFI) {
+        if (WiFi.getMode() == WIFI_AP) return true;
+        if (WiFi.status() == WL_CONNECTED) {
+            return WiFi.localIP() != IPAddress(0, 0, 0, 0);
+        }
     }
     return false;
 }

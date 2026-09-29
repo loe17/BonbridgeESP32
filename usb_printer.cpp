@@ -1,6 +1,7 @@
 #include "usb_printer.h"
 #include <esp_log.h>
 #include <string.h>
+#include "driver/usb_serial_jtag.h"
 
 static const char* TAG = "UsbPrinter";
 
@@ -61,16 +62,27 @@ UsbPrinter& UsbPrinter::instance() {
 bool UsbPrinter::begin() {
     if (initialized) return true;
 
-    writeMutex = xSemaphoreCreateMutex();
+    // Prüfen, ob der USB-Port aktuell mit einem Computer (USB Serial/JTAG) verbunden ist
+    if (usb_serial_jtag_is_connected()) {
+        Serial.println("[USB] USB-Port ist mit einem Computer verbunden (Serial-Monitor / Programmiermodus).");
+        Serial.println("[USB] USB-Host fuer Bondrucker pausiert, solange das Board am PC angeschlossen ist.");
+        Serial.println("[HINWEIS] Fuer Drucker-Betrieb: Board an 5V Netzteil/Drucker anschliessen.");
+        return true;
+    }
 
-    ESP_LOGI(TAG, "Installing USB Host Library...");
+    if (!writeMutex) {
+        writeMutex = xSemaphoreCreateMutex();
+    }
+
+    Serial.println("[USB] Starte USB-Host fuer Bondrucker...");
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
+        .enum_filter_cb = NULL,
     };
     esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to install USB Host: %s", esp_err_to_name(err));
+        Serial.printf("[USB-WARNUNG] Konnte USB-Host nicht starten: %s\n", esp_err_to_name(err));
         return false;
     }
 
@@ -87,15 +99,24 @@ bool UsbPrinter::begin() {
 
     err = usb_host_client_register(&client_config, &client_hdl);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register USB client: %s", esp_err_to_name(err));
+        Serial.printf("[USB-WARNUNG] Konnte USB-Client nicht registrieren: %s\n", esp_err_to_name(err));
         return false;
     }
 
     xTaskCreatePinnedToCore(usb_client_task, "usb_client", 4096, this, 5, NULL, 0);
 
     initialized = true;
-    ESP_LOGI(TAG, "USB Host ready and waiting for ESC/POS printer.");
+    Serial.println("[USB] USB-Host bereit. Warte auf Bondrucker...");
     return true;
+}
+
+void UsbPrinter::update() {
+    if (!initialized) {
+        // Falls das Board vom PC abgesteckt wurde und nun standalone an 5V mit Drucker laeuft
+        if (!usb_serial_jtag_is_connected()) {
+            begin();
+        }
+    }
 }
 
 void UsbPrinter::handleDeviceEvent(usb_host_client_event_msg_t* event_msg) {
@@ -203,7 +224,10 @@ String UsbPrinter::getStatusString() {
     if (deviceConnected) {
         return "Bereit (" + deviceName + ")";
     }
-    return "Nicht verbunden (USB-Kabel pruefen)";
+    if (usb_serial_jtag_is_connected()) {
+        return "USB am Computer angeschlossen (Programmiermodus - kein Drucker)";
+    }
+    return "Nicht verbunden (Warte auf Bondrucker)";
 }
 
 String UsbPrinter::getDeviceName() {

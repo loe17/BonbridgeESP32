@@ -18,11 +18,17 @@ ConfigManager& ConfigManager::instance() {
 
 void ConfigManager::begin() {
     prefs.begin("bonbridge", false);
-    config.wifi_ssid = prefs.getString("ssid", "");
-    config.wifi_password = prefs.getString("pass", "");
-    config.printer_profile = prefs.getInt("profile", PROFILE_EPSON_80MM);
-    config.netwatch_enabled = prefs.getBool("netwatch", true);
-    config.port9100 = prefs.getUShort("port9100", 9100);
+    String savedSsid = prefs.getString("ssid", "");
+    if (savedSsid.length() > 0) {
+        config.wifi_ssid = savedSsid;
+    }
+    String savedPass = prefs.getString("pass", "");
+    if (savedPass.length() > 0) {
+        config.wifi_password = savedPass;
+    }
+    config.printer_profile = prefs.getInt("profile", config.printer_profile);
+    config.netwatch_enabled = prefs.getBool("netwatch", config.netwatch_enabled);
+    config.port9100 = prefs.getUShort("port9100", config.port9100);
 }
 
 AppConfig& ConfigManager::get() {

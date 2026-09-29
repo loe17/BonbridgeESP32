@@ -13,6 +13,7 @@ public:
 
     // Startet den USB Host Treiber und die Hintergrund-Aufgaben
     bool begin();
+    void update();
 
     // Zustand des Druckers
     bool isConnected();
