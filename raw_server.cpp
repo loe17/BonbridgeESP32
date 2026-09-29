@@ -33,8 +33,8 @@ void RawServer::update() {
             activeClient = newClient;
             activeClient.setNoDelay(true);
             clientActive = true;
-            ESP_LOGI(TAG, "Kassensystem verbunden (%s:%d)", 
-                     activeClient.remoteIP().toString().c_str(), activeClient.remotePort());
+            Serial.printf("[KASSE] Neuer Druckauftrag von Kasse (%s:%d)\n", 
+                          activeClient.remoteIP().toString().c_str(), activeClient.remotePort());
         }
     }
 
@@ -48,7 +48,7 @@ void RawServer::update() {
                 totalBytesReceived += bytesRead;
                 size_t written = UsbPrinter::instance().write(rxBuffer, bytesRead);
                 if (written < (size_t)bytesRead) {
-                    ESP_LOGW(TAG, "USB-Drucker konnte nicht alle Daten aufnehmen (%u von %d)", written, bytesRead);
+                    Serial.printf("[WARNUNG] USB-Drucker-Puffer voll (%u von %d Bytes geschrieben)\n", written, bytesRead);
                 }
             }
         }
@@ -58,7 +58,7 @@ void RawServer::update() {
     if (clientActive && !activeClient.connected()) {
         activeClient.stop();
         clientActive = false;
-        ESP_LOGI(TAG, "Druckauftrag beendet, Verbindung geschlossen.");
+        Serial.printf("[KASSE] Druckauftrag abgeschlossen (Gesamt: %lu Bytes an Drucker gesendet).\n", totalBytesReceived);
     }
 }
 

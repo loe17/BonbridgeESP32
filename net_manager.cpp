@@ -9,26 +9,45 @@ static NetManager* s_instance = nullptr;
 static void onWiFiEthEvent(WiFiEvent_t event) {
     switch (event) {
         case ARDUINO_EVENT_ETH_START:
-            ESP_LOGI(TAG, "ETH Gestartet");
+            Serial.println("[NETZWERK] LAN-Treiber (W5500) gestartet.");
             ETH.setHostname("BonbridgeESP32");
             break;
         case ARDUINO_EVENT_ETH_CONNECTED:
-            ESP_LOGI(TAG, "ETH Kabel eingesteckt (Link Up)");
+            Serial.println("[NETZWERK] LAN-Kabel eingesteckt (Link Up) - warte auf IP-Adresse...");
             break;
         case ARDUINO_EVENT_ETH_GOT_IP:
-            ESP_LOGI(TAG, "ETH IP erhalten: %s", ETH.localIP().toString().c_str());
+            Serial.println();
+            Serial.println("--------------------------------------------------");
+            Serial.println("[VERBINDUNG HERGESTELLT - LAN-KABEL]");
+            Serial.println("  Schnittstelle      : LAN-Kabel aktiv (WLAN ist aus)");
+            Serial.print("  IP-Adresse         : "); Serial.println(ETH.localIP());
+            Serial.print("  Subnetzmaske       : "); Serial.println(ETH.subnetMask());
+            Serial.print("  Gateway            : "); Serial.println(ETH.gatewayIP());
+            Serial.print("  Web-Oberflaeche    : http://"); Serial.println(ETH.localIP());
+            Serial.print("  Kassen-Drucker-Port: "); Serial.print(ETH.localIP()); Serial.println(":9100");
+            Serial.println("--------------------------------------------------");
+            Serial.println();
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
-            ESP_LOGW(TAG, "ETH Kabel abgezogen (Link Down)");
+            Serial.println("[WARNUNG] LAN-Kabel abgezogen (Link Down)! Versuche WLAN...");
             break;
         case ARDUINO_EVENT_ETH_STOP:
-            ESP_LOGI(TAG, "ETH Gestoppt");
+            Serial.println("[NETZWERK] Ethernet gestoppt.");
             break;
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-            ESP_LOGI(TAG, "WLAN IP erhalten: %s", WiFi.localIP().toString().c_str());
+            Serial.println();
+            Serial.println("--------------------------------------------------");
+            Serial.println("[VERBINDUNG HERGESTELLT - WLAN]");
+            Serial.print("  WLAN-Name (SSID)   : "); Serial.println(WiFi.SSID());
+            Serial.print("  Signalstaerke      : "); Serial.print(WiFi.RSSI()); Serial.println(" dBm");
+            Serial.print("  IP-Adresse         : "); Serial.println(WiFi.localIP());
+            Serial.print("  Web-Oberflaeche    : http://"); Serial.println(WiFi.localIP());
+            Serial.print("  Kassen-Drucker-Port: "); Serial.print(WiFi.localIP()); Serial.println(":9100");
+            Serial.println("--------------------------------------------------");
+            Serial.println();
             break;
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-            ESP_LOGW(TAG, "WLAN getrennt");
+            Serial.println("[WARNUNG] WLAN-Verbindung getrennt!");
             break;
         default:
             break;
@@ -83,7 +102,8 @@ void NetManager::initEthernet() {
 void NetManager::startWifi() {
     AppConfig& conf = ConfigManager::instance().get();
     if (conf.wifi_ssid.length() == 0) {
-        ESP_LOGI(TAG, "Keine WLAN-Zugangsdaten hinterlegt.");
+        Serial.println("[NETZWERK] Kein LAN-Kabel gesteckt und keine WLAN-Zugangsdaten im Speicher.");
+        Serial.println("[HINWEIS] Bitte LAN-Kabel einstecken oder WLAN-Daten im Web-Menue eintragen.");
         stopWifi();
         return;
     }
@@ -92,7 +112,8 @@ void NetManager::startWifi() {
         return; // Bereits verbunden
     }
 
-    ESP_LOGI(TAG, "Aktiviere WLAN und verbinde mit SSID: %s", conf.wifi_ssid.c_str());
+    Serial.print("[WLAN] Aktiviere WLAN und verbinde mit: ");
+    Serial.println(conf.wifi_ssid);
     WiFi.mode(WIFI_STA);
     WiFi.setHostname("BonbridgeESP32");
     WiFi.begin(conf.wifi_ssid.c_str(), conf.wifi_password.c_str());
@@ -102,7 +123,7 @@ void NetManager::startWifi() {
 
 void NetManager::stopWifi() {
     if (WiFi.getMode() != WIFI_OFF) {
-        ESP_LOGI(TAG, "Deaktiviere WLAN (Kabelverbindung aktiv oder keine Zugangsdaten)");
+        Serial.println("[WLAN] Deaktiviere WLAN-Modul (Kabelverbindung aktiv).");
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
         wifiAttemptActive = false;
@@ -124,11 +145,11 @@ void NetManager::checkConnections() {
     if (currentEthLink != ethLinkUp) {
         ethLinkUp = currentEthLink;
         if (ethLinkUp) {
-            ESP_LOGI(TAG, "LAN-Kabel erkannt! Schalte WLAN ab.");
+            Serial.println("[NETZWERK] LAN-Kabelverbindung erkannt! WLAN wird deaktiviert.");
             stopWifi();
             currentMode = NET_MODE_ETHERNET;
         } else {
-            ESP_LOGW(TAG, "LAN-Kabel verloren! Versuche WLAN zu aktivieren...");
+            Serial.println("[NETZWERK] Kein Signal auf dem LAN-Kabel. Aktiviere WLAN-Reserve...");
             startWifi();
         }
     }

@@ -95,18 +95,32 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 
 ## Erste Schritte & Bedienung
 
-1. **Einschalten:** Nach dem Anschließen an 5V startet der Adapter in weniger als 2 Sekunden.
-2. **Web-Oberfläche öffnen:**
-   * Stecke das LAN-Kabel ein.
-   * Schau im Router nach der vergebenen IP-Adresse (oder drücke nach dem Start einmal kurz auf den Drucker, falls eingerichtet).
+1. **Einschalten & Status-LED (Lebenszeichen):**
+   * Nach dem Anstecken an den Strom startet der Adapter in weniger als 2 Sekunden.
+   * **Hinweis zur LED:** Auf vielen ESP32-S3 Mini-Boards geht die kleine rote Ladeleuchte nach wenigen Sekunden aus. Das ist völlig normal, da kein Akku angeschlossen ist!
+   * **Herzschlag:** Die blaue Status-LED auf dem Board schaltet im ruhigen Sekundentakt um. Solange sie gleichmäßig blinkt, läuft das Gerät einwandfrei.
+
+2. **IP-Adresse sofort ablesen (Serieller Monitor):**
+   * Öffne in der Arduino IDE oben rechts die Lupe (**Serieller Monitor**).
+   * Stelle unten rechts die Geschwindigkeit auf **115200 Baud**.
+   * Beim Starten oder Verbinden siehst du sofort im Klartext:
+     * Die vergebene **IP-Adresse**
+     * Ob **LAN-Kabel** oder **WLAN** aktiv ist
+     * Die Web-Adresse (`http://...`) und den Drucker-Port (`:9100`)
+     * Den Status deines angeschlossenen USB-Bondruckers
+
+3. **Web-Oberfläche öffnen:**
+   * Stecke das LAN-Kabel ein (oder nutze die im Monitor angezeigte IP-Adresse).
    * Öffne im Browser: `http://<IP-Adresse-des-ESP>/`
-3. **Einstellen:**
+
+4. **Einstellen:**
    * **Aktuelle Verbindung:** Die Seite zeigt dir oben direkt an, ob LAN oder WLAN genutzt wird.
    * **WLAN eintragen:** Trage deinen WLAN-Namen und das Passwort ein, damit der Adapter automatisch darauf zurückgreifen kann, falls das Kabel einmal abgezogen wird.
-   * **Drucktest & Kassenlade:** Klicke auf die Test-Buttons, um Drucker und Geldschublade zu prüfen.
+   * **Drucktest & Kassenlade:** Klicke auf die Test-Knöpfe, um Drucker und Geldschublade direkt vom Browser aus zu testen.
    * Klicke auf **Einstellungen speichern**.
-4. **Im Kassensystem einrichten:**
+
+5. **Im Kassensystem einrichten:**
    * Wähle in deiner Kassen-App (z. B. Kassensoftware) **Netzwerk-Drucker / ESC-POS**.
    * Gib die **IP-Adresse** des ESP32 ein.
    * Gib als Port **9100** ein.
-   * Fertig! Ab sofort druckt deine Kasse über den Adapter.
+   * Fertig! Ab sofort druckt deine Kasse zuverlässig über den Adapter.

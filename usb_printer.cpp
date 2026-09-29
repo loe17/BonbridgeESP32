@@ -153,21 +153,29 @@ void UsbPrinter::handleDeviceEvent(usb_host_client_event_msg_t* event_msg) {
                     snprintf(nameBuf, sizeof(nameBuf), "ESC/POS Drucker (VID:%04X PID:%04X)", 
                              dev_desc->idVendor, dev_desc->idProduct);
                     setDeviceConnected(true, String(nameBuf), bulkOutEp, maxPacket, new_dev_hdl);
-                    ESP_LOGI(TAG, "Printer claimed successfully: %s, EP OUT: 0x%02X, MaxPacket: %d", 
-                             nameBuf, bulkOutEp, maxPacket);
+                    Serial.println();
+                    Serial.println("--------------------------------------------------");
+                    Serial.printf("[USB] Neuer Bondrucker erkannt: %s\n", nameBuf);
+                    Serial.printf("  Endpunkt (OUT)     : 0x%02X (Paketgroesse: %d Bytes)\n", bulkOutEp, maxPacket);
+                    Serial.println("  Status             : Drucker ist BEREIT fuer Druckauftraege.");
+                    Serial.println("--------------------------------------------------");
+                    Serial.println();
                 } else {
-                    ESP_LOGE(TAG, "Could not claim interface: %s", esp_err_to_name(err));
+                    Serial.printf("[USB-FEHLER] Konnte Drucker-Schnittstelle nicht belegen: %s\n", esp_err_to_name(err));
                     usb_host_device_close(client_hdl, new_dev_hdl);
                 }
             } else {
-                ESP_LOGW(TAG, "No Bulk OUT endpoint found on device.");
+                Serial.println("[USB-WARNUNG] USB-Geraet angeschlossen, aber kein ESC/POS Druck-Endpunkt gefunden.");
                 usb_host_device_close(client_hdl, new_dev_hdl);
             }
             break;
         }
 
         case USB_HOST_CLIENT_EVENT_DEV_GONE: {
-            ESP_LOGW(TAG, "USB device disconnected!");
+            Serial.println();
+            Serial.println("[USB-WARNUNG] Bondrucker wurde ausgesteckt oder getrennt!");
+            Serial.println("  Bitte USB-Kabel und Drucker pruefen.");
+            Serial.println();
             setDeviceConnected(false, "Kein Drucker angeschlossen", 0, 64, NULL);
             break;
         }
