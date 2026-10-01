@@ -7,6 +7,8 @@
 #include "netwatch.h"
 #include "ota_updater.h"
 #include <esp_log.h>
+#include <esp_system.h>
+#include "soc/rtc_cntl_struct.h"
 
 static const char* TAG = "Main";
 
@@ -29,7 +31,16 @@ static void setStatusLed(bool on) {
 }
 
 void setup() {
+    // 0. Hardware-Brownout-Reset entschaerfen (verhindert Endlos-Reboot-Schleifen bei 
+    // kurzzeitigen Millisekunden-Spannungseinbruechen waehrend WLAN-Funkspitzen)
+    RTCCNTL.brown_out.rst_ena = 0;
+    RTCCNTL.brown_out.ana_rst_en = 0;
+
     Serial.begin(115200);
+
+    // Startgrund fuer Diagnose und WebUI erfassen
+    esp_reset_reason_t resetReason = esp_reset_reason();
+    WebUI::instance().setResetReason((uint8_t)resetReason);
 
     // Bis zu 2 Sekunden warten, falls der USB-Serielle-Monitor verbunden wird
     unsigned long startWait = millis();
@@ -53,6 +64,15 @@ void setup() {
     Serial.println("==================================================");
     Serial.println("        BonbridgeESP32 - Drucker-Adapter          ");
     Serial.println("==================================================");
+    Serial.print("[START] Start-Grund: ");
+    switch (resetReason) {
+        case ESP_RST_POWERON:   Serial.println("Normal (Einschalten / Power On)"); break;
+        case ESP_RST_EXT:       Serial.println("Externer Reset-Pin"); break;
+        case ESP_RST_SW:        Serial.println("Software-Neustart"); break;
+        case ESP_RST_PANIC:     Serial.println("WARNUNG: Absturz / Panic-Reset!"); break;
+        case ESP_RST_BROWNOUT:  Serial.println("WARNUNG: Brownout! Spannungseinbruch an 5V Stromversorgung!"); break;
+        default:                Serial.printf("Code %d\n", (int)resetReason); break;
+    }
     Serial.println("[START] Lade Konfiguration aus dem Speicher...");
 
     // 1. Einstellungen aus dem Speicher laden
@@ -89,8 +109,11 @@ void loop() {
     // 2. Netzwerk-Verbindung überwachen & umschalten
     NetManager::instance().update();
 
-    // 3. USB-Drucker Status überwachen (startet 2,5 Sekunden nach Boot, damit WLAN ungestört verbindet)
-    if (now > 2500) {
+    // 3. USB-Drucker Status überwachen:
+    // USB-Host wird erst gestartet, wenn die Netzwerk-Verbindung (WLAN oder LAN) steht
+    // oder der Einrichtungs-Hotspot aktiv ist (bzw. 15s Sicherheits-Fallback).
+    // So kann die WLAN-Verbindung und DHCP-Zuweisung absolut ungestoert ablaufen!
+    if (NetManager::instance().isOnline() || now > 15000) {
         UsbPrinter::instance().update();
     }
 

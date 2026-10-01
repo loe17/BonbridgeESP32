@@ -2,6 +2,8 @@
 #include <esp_log.h>
 #include <string.h>
 #include "driver/usb_serial_jtag.h"
+#include "soc/rtc_cntl_struct.h"
+#include "soc/usb_wrap_struct.h"
 
 static const char* TAG = "UsbPrinter";
 
@@ -85,17 +87,24 @@ bool UsbPrinter::begin() {
     Serial.println("[USB] Starte USB-Host fuer Bondrucker...");
     Serial.flush();
     delay(20);
-    // USB-CDC vor der Umschaltung auf USB-Host ordnungsgemaess beenden,
-    // damit keine Interrupt-Kollision auf dem USB-PHY entsteht.
-    Serial.end();
+
+    // Internen USB-PHY direkt fuer USB-Host (OTG) konfigurieren
+    RTCCNTL.usb_conf.sw_hw_usb_phy_sel = 1;
+    RTCCNTL.usb_conf.sw_usb_phy_sel = 1;
+    USB_WRAP.otg_conf.phy_sel = 0;        // 0 = interner PHY
+    USB_WRAP.otg_conf.pad_enable = 1;     // USB-Pads aktivieren
+    USB_WRAP.otg_conf.ahb_clk_force_on = 1;
+    USB_WRAP.otg_conf.phy_clk_force_on = 1;
 
     const usb_host_config_t host_config = {
-        .skip_phy_setup = false,
+        .skip_phy_setup = true,           // Eigene PHY-Konfiguration verwenden, vermeidet ESP-IDF Abort
+        .root_port_unpowered = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
         .enum_filter_cb = NULL,
     };
     esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "usb_host_install fehlgeschlagen: %s", esp_err_to_name(err));
         initialized = true;
         return false;
     }

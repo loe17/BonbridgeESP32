@@ -11,12 +11,16 @@ public:
     bool begin(uint16_t port = 80);
     void update();
 
+    void setResetReason(uint8_t reason);
+    String getResetReasonString() const;
+
 private:
     WebUI();
 
     std::unique_ptr<WebServer> server;
     String lastMessage;
     bool messageIsError;
+    uint8_t resetReasonCode;
 
     void handleRoot();
     void handleAction();

@@ -11,8 +11,25 @@ static const char* TAG = "WebUI";
 WebUI::WebUI() :
     server(nullptr),
     lastMessage(""),
-    messageIsError(false)
+    messageIsError(false),
+    resetReasonCode(1)
 {
+}
+
+void WebUI::setResetReason(uint8_t reason) {
+    resetReasonCode = reason;
+}
+
+String WebUI::getResetReasonString() const {
+    switch (resetReasonCode) {
+        case 1:  return "<span style=\"color:#198754;\">Normal (Einschalten / Power On)</span>";
+        case 2:  return "Externer Pin-Reset";
+        case 3:  return "Software-Neustart";
+        case 4:  return "<span style=\"color:#dc3545;\">⚠️ Warnung: Absturz / Panic</span>";
+        case 9:  return "<span style=\"color:#dc3545;\">⚠️ Warnung: Brownout (Spannungseinbruch an 5V Pins!)</span>";
+        case 11: return "USB-Reset";
+        default: return "Normal (Code " + String(resetReasonCode) + ")";
+    }
 }
 
 WebUI& WebUI::instance() {
@@ -326,6 +343,7 @@ String WebUI::generateHtmlPage() {
         html += "<div style=\"font-size:12px;color:#856404;background:#fff3cd;padding:8px 10px;border-radius:4px;margin-top:6px;line-height:1.4;\">💡 <b>Hinweis:</b> Board ist am PC angeschlossen (Diagnose- und Programmiermodus). F&uuml;r den Bondrucker-Betrieb das Board an ein 5V-Netzteil anschlie&szlig;en und den Drucker per USB-OTG-Kabel direkt verbinden.</div>";
     }
     html += "<div class=\"info-row\"><span class=\"info-label\">Empfangene Daten</span><span class=\"info-val\">" + String(RawServer::instance().getTotalBytesReceived()) + " Bytes</span></div>";
+    html += "<div class=\"info-row\"><span class=\"info-label\">System-Start</span><span class=\"info-val\">" + getResetReasonString() + "</span></div>";
 
     // Schnell-Aktionen
     html += "<div class=\"section-title\">Schnell-Tests</div>";

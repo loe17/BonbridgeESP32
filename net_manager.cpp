@@ -313,7 +313,8 @@ bool NetManager::isOnline() {
         return ETH.localIP() != IPAddress(0, 0, 0, 0);
     }
     if (currentMode == NET_MODE_WIFI) {
-        if (WiFi.getMode() == WIFI_AP) return true;
+        wifi_mode_t m = WiFi.getMode();
+        if (m == WIFI_AP || m == WIFI_AP_STA) return true;
         if (WiFi.status() == WL_CONNECTED) {
             return WiFi.localIP() != IPAddress(0, 0, 0, 0);
         }

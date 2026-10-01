@@ -53,12 +53,16 @@ Er nimmt Druckaufträge über ein **Netzwerkkabel (LAN)** oder über **WLAN** en
 ## Verkabelung (Pin-Belegung)
 
 ### 1. Stromversorgung
-| Netzteil / Quelle | ESP32-S3 Pin |
-|---|---|
-| +5V (Plus) | **5V** (bzw. VIN) |
-| GND (Minus) | **GND** |
+| Netzteil / Quelle | ESP32-S3 Pin | Hinweise |
+|---|---|---|
+| **+5V (Plus)** | **5V** (bzw. VIN) | Stabiles 5V-Netzteil (mindestens **1,5 A bis 2 A** empfohlen) |
+| **GND (Minus)** | **GND** | Gemeinsame Masse |
 
-*(Wichtig: Auch die 5V-Leitung der USB-Buchse für den Drucker muss mit 5V versorgt werden, damit der Druckeranschluss Strom hat.)*
+> [!TIP]
+> **Tipps für eine stabile 5V-Stromversorgung:**
+> * Verwende möglichst **kurze und dicke Kabel** (keine langen, hauchdünnen Steckbrett-Drähte). Beim Senden von WLAN-Daten benötigt der Funkchip kurzzeitig Stromspitzen bis zu 450 mA – zu dünne Drähte führen zu einem Spannungsabfall (Brownout).
+> * Das System verfügt über eine integrierte **Spannungsüberwachung**: Auf der Weboberfläche siehst du in der Zeile *„System-Start“* sofort, ob das Board sauber gestartet ist oder ob ein Spannungseinbruch aufgetreten ist.
+> * Auch die 5V-Leitung der USB-Buchse für den Drucker muss mit 5V versorgt werden, damit der Druckeranschluss Strom hat.
 
 ### 2. W5500 Netzwerk-Modul (LAN-Kabel)
 Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
