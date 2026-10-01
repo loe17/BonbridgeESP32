@@ -72,10 +72,6 @@ void setup() {
     // 5. Netzwerk-Wächter aktivieren
     NetWatch::instance().begin();
 
-    // 6. USB-Host für ESC/POS Bondrucker (nach Netzwerk starten)
-    Serial.println("[START] Initialisiere USB-Schnittstelle...");
-    UsbPrinter::instance().begin();
-
     Serial.println("[START] System betriebsbereit.");
     Serial.println("==================================================");
     Serial.println();
@@ -93,8 +89,10 @@ void loop() {
     // 2. Netzwerk-Verbindung überwachen & umschalten
     NetManager::instance().update();
 
-    // 3. USB-Drucker Status überwachen
-    UsbPrinter::instance().update();
+    // 3. USB-Drucker Status überwachen (startet 2,5 Sekunden nach Boot, damit WLAN ungestört verbindet)
+    if (now > 2500) {
+        UsbPrinter::instance().update();
+    }
 
     // 4. Port 9100 Daten-Tunnel verarbeiten (direktes Streaming an USB)
     RawServer::instance().update();

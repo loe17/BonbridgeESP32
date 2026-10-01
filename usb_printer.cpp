@@ -14,16 +14,13 @@ static const char* TAG = "UsbPrinter";
 
 static void usb_host_lib_task(void *pvParameters) {
     while (1) {
-        uint32_t event_flags;
-        esp_err_t err = usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "usb_host_lib_handle_events error: %d", err);
+        uint32_t event_flags = 0;
+        esp_err_t err = usb_host_lib_handle_events(pdMS_TO_TICKS(100), &event_flags);
+        if (err != ESP_OK && err != ESP_ERR_TIMEOUT) {
+            vTaskDelay(pdMS_TO_TICKS(20));
         }
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
-            ESP_LOGI(TAG, "No clients in USB host");
-        }
-        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) {
-            ESP_LOGI(TAG, "USB host all free");
+            usb_host_device_free_all();
         }
     }
 }
@@ -38,7 +35,14 @@ static void client_event_cb(const usb_host_client_event_msg_t *event_msg, void *
 static void usb_client_task(void *pvParameters) {
     UsbPrinter *printer = (UsbPrinter *)pvParameters;
     while (1) {
-        usb_host_client_handle_events(printer->getClientHandle(), portMAX_DELAY);
+        if (printer && printer->getClientHandle() != NULL) {
+            esp_err_t err = usb_host_client_handle_events(printer->getClientHandle(), pdMS_TO_TICKS(100));
+            if (err != ESP_OK && err != ESP_ERR_TIMEOUT) {
+                vTaskDelay(pdMS_TO_TICKS(20));
+            }
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
     }
 }
 
@@ -79,6 +83,12 @@ bool UsbPrinter::begin() {
     }
 
     Serial.println("[USB] Starte USB-Host fuer Bondrucker...");
+    Serial.flush();
+    delay(20);
+    // USB-CDC vor der Umschaltung auf USB-Host ordnungsgemaess beenden,
+    // damit keine Interrupt-Kollision auf dem USB-PHY entsteht.
+    Serial.end();
+
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
@@ -86,12 +96,12 @@ bool UsbPrinter::begin() {
     };
     esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
-        Serial.printf("[USB-WARNUNG] Konnte USB-Host nicht starten: %s\n", esp_err_to_name(err));
         initialized = true;
         return false;
     }
 
-    xTaskCreatePinnedToCore(usb_host_lib_task, "usb_lib", 4096, NULL, 5, NULL, 0);
+    // Task auf Core 1 mit Prioritaet 2 erstellen (WLAN & Netzwerk auf Core 0 bleiben ungestoert)
+    xTaskCreatePinnedToCore(usb_host_lib_task, "usb_lib", 4096, NULL, 2, NULL, 1);
 
     const usb_host_client_config_t client_config = {
         .is_synchronous = false,
@@ -104,15 +114,13 @@ bool UsbPrinter::begin() {
 
     err = usb_host_client_register(&client_config, &client_hdl);
     if (err != ESP_OK) {
-        Serial.printf("[USB-WARNUNG] Konnte USB-Client nicht registrieren: %s\n", esp_err_to_name(err));
         initialized = true;
         return false;
     }
 
-    xTaskCreatePinnedToCore(usb_client_task, "usb_client", 4096, this, 5, NULL, 0);
+    xTaskCreatePinnedToCore(usb_client_task, "usb_client", 4096, this, 2, NULL, 1);
 
     initialized = true;
-    Serial.println("[USB] USB-Host bereit. Warte auf Bondrucker...");
     return true;
 }
 
