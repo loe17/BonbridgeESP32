@@ -44,6 +44,7 @@ static void usb_client_task(void *pvParameters) {
 
 UsbPrinter::UsbPrinter() :
     initialized(false),
+    pcConnectedMode(false),
     deviceConnected(false),
     deviceName("Kein Drucker angeschlossen"),
     outEndpoint(0),
@@ -64,9 +65,12 @@ bool UsbPrinter::begin() {
 
     // Prüfen, ob der USB-Port aktuell mit einem Computer (USB Serial/JTAG) verbunden ist
     if (usb_serial_jtag_is_connected()) {
+        initialized = true;
+        pcConnectedMode = true;
+        deviceName = "Pausiert (Board am PC angeschlossen)";
         Serial.println("[USB] USB-Port ist mit einem Computer verbunden (Serial-Monitor / Programmiermodus).");
         Serial.println("[USB] USB-Host fuer Bondrucker pausiert, solange das Board am PC angeschlossen ist.");
-        Serial.println("[HINWEIS] Fuer Drucker-Betrieb: Board an 5V Netzteil/Drucker anschliessen.");
+        Serial.println("[HINWEIS] Fuer Drucker-Betrieb: Board an 5V Netzteil anschliessen und Drucker per USB verbinden.");
         return true;
     }
 
@@ -83,6 +87,7 @@ bool UsbPrinter::begin() {
     esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
         Serial.printf("[USB-WARNUNG] Konnte USB-Host nicht starten: %s\n", esp_err_to_name(err));
+        initialized = true;
         return false;
     }
 
@@ -100,6 +105,7 @@ bool UsbPrinter::begin() {
     err = usb_host_client_register(&client_config, &client_hdl);
     if (err != ESP_OK) {
         Serial.printf("[USB-WARNUNG] Konnte USB-Client nicht registrieren: %s\n", esp_err_to_name(err));
+        initialized = true;
         return false;
     }
 
@@ -111,11 +117,12 @@ bool UsbPrinter::begin() {
 }
 
 void UsbPrinter::update() {
+    // Wenn das Board am Computer angeschlossen ist, niemals den Host-Modus erzwingen
+    if (pcConnectedMode) {
+        return;
+    }
     if (!initialized) {
-        // Falls das Board vom PC abgesteckt wurde und nun standalone an 5V mit Drucker laeuft
-        if (!usb_serial_jtag_is_connected()) {
-            begin();
-        }
+        begin();
     }
 }
 
@@ -132,11 +139,21 @@ void UsbPrinter::handleDeviceEvent(usb_host_client_event_msg_t* event_msg) {
                 return;
             }
 
-            const usb_device_desc_t *dev_desc;
-            usb_host_get_device_descriptor(new_dev_hdl, &dev_desc);
+            const usb_device_desc_t *dev_desc = NULL;
+            err = usb_host_get_device_descriptor(new_dev_hdl, &dev_desc);
+            if (err != ESP_OK || dev_desc == NULL) {
+                ESP_LOGE(TAG, "Failed to get device descriptor: %s", esp_err_to_name(err));
+                usb_host_device_close(client_hdl, new_dev_hdl);
+                return;
+            }
 
-            const usb_config_desc_t *config_desc;
-            usb_host_get_active_config_descriptor(new_dev_hdl, &config_desc);
+            const usb_config_desc_t *config_desc = NULL;
+            err = usb_host_get_active_config_descriptor(new_dev_hdl, &config_desc);
+            if (err != ESP_OK || config_desc == NULL) {
+                ESP_LOGE(TAG, "Failed to get config descriptor: %s", esp_err_to_name(err));
+                usb_host_device_close(client_hdl, new_dev_hdl);
+                return;
+            }
 
             uint8_t bulkOutEp = 0;
             uint16_t maxPacket = 64;
@@ -148,6 +165,7 @@ void UsbPrinter::handleDeviceEvent(usb_host_client_event_msg_t* event_msg) {
             const uint8_t *p = (const uint8_t *)config_desc;
             while (offset < config_desc->wTotalLength) {
                 const usb_standard_desc_t *desc = (const usb_standard_desc_t *)(p + offset);
+                if (desc->bLength == 0) break; // Schutz gegen Endlosschleife bei defekten Descriptoren
                 if (desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_INTERFACE) {
                     const usb_intf_desc_t *intf = (const usb_intf_desc_t *)desc;
                     intfNum = intf->bInterfaceNumber;
@@ -197,6 +215,9 @@ void UsbPrinter::handleDeviceEvent(usb_host_client_event_msg_t* event_msg) {
             Serial.println("[USB-WARNUNG] Bondrucker wurde ausgesteckt oder getrennt!");
             Serial.println("  Bitte USB-Kabel und Drucker pruefen.");
             Serial.println();
+            if (dev_hdl != NULL) {
+                usb_host_device_close(client_hdl, dev_hdl);
+            }
             setDeviceConnected(false, "Kein Drucker angeschlossen", 0, 64, NULL);
             break;
         }
@@ -224,7 +245,7 @@ String UsbPrinter::getStatusString() {
     if (deviceConnected) {
         return "Bereit (" + deviceName + ")";
     }
-    if (usb_serial_jtag_is_connected()) {
+    if (pcConnectedMode || usb_serial_jtag_is_connected()) {
         return "USB am Computer angeschlossen (Programmiermodus - kein Drucker)";
     }
     return "Nicht verbunden (Warte auf Bondrucker)";

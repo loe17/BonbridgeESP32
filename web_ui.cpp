@@ -320,7 +320,11 @@ String WebUI::generateHtmlPage() {
     // Status-Details
     html += "<div class=\"info-row\"><span class=\"info-label\">IP-Adresse</span><span class=\"info-val\">" + ipStr + "</span></div>";
     html += "<div class=\"info-row\"><span class=\"info-label\">RAW Kassen-Port</span><span class=\"info-val\">9100</span></div>";
-    html += "<div class=\"info-row\"><span class=\"info-label\">USB-Drucker</span><span class=\"info-val\" style=\"color:" + String(printerOk ? "#198754" : "#dc3545") + "\">" + printerStatus + "</span></div>";
+    String printerColor = printerOk ? "#198754" : (UsbPrinter::instance().isPcConnected() ? "#b78103" : "#dc3545");
+    html += "<div class=\"info-row\"><span class=\"info-label\">USB-Drucker</span><span class=\"info-val\" style=\"color:" + printerColor + "\">" + printerStatus + "</span></div>";
+    if (UsbPrinter::instance().isPcConnected()) {
+        html += "<div style=\"font-size:12px;color:#856404;background:#fff3cd;padding:8px 10px;border-radius:4px;margin-top:6px;line-height:1.4;\">💡 <b>Hinweis:</b> Board ist am PC angeschlossen (Diagnose- und Programmiermodus). F&uuml;r den Bondrucker-Betrieb das Board an ein 5V-Netzteil anschlie&szlig;en und den Drucker per USB-OTG-Kabel direkt verbinden.</div>";
+    }
     html += "<div class=\"info-row\"><span class=\"info-label\">Empfangene Daten</span><span class=\"info-val\">" + String(RawServer::instance().getTotalBytesReceived()) + " Bytes</span></div>";
 
     // Schnell-Aktionen

@@ -17,6 +17,7 @@ public:
 
     // Zustand des Druckers
     bool isConnected();
+    bool isPcConnected() const { return pcConnectedMode; }
     String getStatusString();
     String getDeviceName();
 
@@ -41,6 +42,7 @@ private:
     UsbPrinter();
     
     bool initialized;
+    bool pcConnectedMode;
     bool deviceConnected;
     String deviceName;
     uint8_t outEndpoint;

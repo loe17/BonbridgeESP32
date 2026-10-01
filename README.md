@@ -86,6 +86,11 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 > **Wichtig – Keinen USB-C-Hub verwenden:**
 > Ein USB-Hub (Mehrfachverteiler) besitzt einen eigenen Steuerchip und verhindert, dass der ESP32-S3 den Drucker erkennt. Verwende stattdessen einen einfachen **USB-OTG-Adapter** (USB-C auf USB-A) oder ein **OTG-Y-Kabel** mit direkter Stromeinspeisung.
 
+> [!NOTE]
+> **Betrieb am Computer vs. Drucker-Betrieb:**
+> * **Am Computer angeschlossen (USB-Kabel zum PC):** Der ESP32 erkennt die PC-Verbindung automatisch. Der USB-Druckermodus wird pausiert, damit der serielle Monitor und die Programmierung stabil funktionieren. Die Web-Oberfläche und das Netzwerk laufen uneingeschränkt.
+> * **Im Kassen-/Drucker-Betrieb:** Betreibe das Board an einem 5V-Netzteil (z. B. 5V/GND-Pins oder zweiter Anschluss). Der Drucker wird direkt über einen einfachen USB-OTG-Adapter (USB-C auf USB-A) angesteckt.
+
 ---
 
 ## Software auf den ESP32 übertragen
