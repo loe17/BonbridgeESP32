@@ -60,6 +60,8 @@ Er nimmt Druckaufträge über ein **Netzwerkkabel (LAN)** oder über **WLAN** en
 
 > [!TIP]
 > **Tipps für eine stabile 5V-Stromversorgung:**
+> * **5V über Pins oder USB:** Du kannst den ESP32-S3 über die Pins (**5V** und **GND**) mit einem 5V-Labornetzteil/Netzteil versorgen, oder direkt über ein 5V-USB-Netzteil (am besten mit Standard USB-A auf USB-C Kabel).
+> * **Messpunkt zur Kontrolle:** Liegt an den Pins 5V an, muss am Pin **3V3** (gegen GND gemessen) eine saubere Spannung von 3,3 Volt anliegen.
 > * Verwende möglichst **kurze und dicke Kabel** (keine langen, hauchdünnen Steckbrett-Drähte). Beim Senden von WLAN-Daten benötigt der Funkchip kurzzeitig Stromspitzen bis zu 450 mA – zu dünne Drähte führen zu einem Spannungsabfall (Brownout).
 > * Das System verfügt über eine integrierte **Spannungsüberwachung**: Auf der Weboberfläche siehst du in der Zeile *„System-Start“* sofort, ob das Board sauber gestartet ist oder ob ein Spannungseinbruch aufgetreten ist.
 > * Auch die 5V-Leitung der USB-Buchse für den Drucker muss mit 5V versorgt werden, damit der Druckeranschluss Strom hat.
@@ -121,10 +123,13 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 
 ## Erste Schritte & Bedienung
 
-1. **Einschalten & Status-LED (Lebenszeichen):**
-   * Nach dem Anstecken an den Strom blitzt die LED 3x kurz auf als Startsignal.
-   * Danach schaltet sie im ruhigen Sekundentakt um („Herzschlag“). Solange sie gleichmäßig blinkt, läuft das Gerät einwandfrei.
-   * **Hinweis zur Lade-LED:** Auf dem Board befindet sich auch eine kleine rote Ladeleuchte. Diese erlischt nach wenigen Sekunden, weil kein Akku angeschlossen ist – das ist völlig normal!
+1. **Einschalten & Status-LED (Lebenszeichen & Farbcode):**
+   * Direkt nach dem Einschalten leuchtet die RGB-LED (GPIO 48) **Violett** (bestätigt sofort: Stromversorgung steht, Prozessor läuft!).
+   * **Grün (sanfter Puls / Herzschlag):** Erfolgreich mit dem Netzwerk (WLAN oder LAN) verbunden und betriebsbereit!
+   * **Blau (Puls):** Einrichtungs-Hotspot (`Bonbridge-Setup`) ist aktiv – verbinde dich mit dem WLAN und öffne `http://192.168.4.1`.
+   * **Gelb / Orange (blinkend):** Das Gerät sucht das WLAN und versucht die Verbindung zum Router herzustellen.
+   * **LED bleibt dunkel?** Bitte mit einem Multimeter prüfen, ob zwischen Pin **3V3** und **GND** ca. 3,3 Volt anliegen (z. B. Kabelverbindung, Polung oder Strombegrenzung am Netzteil prüfen).
+   * **Hinweis zur Lade-LED:** Auf manchen Boards befindet sich zusätzlich eine winzige rote Akkulade-LED. Diese erlischt nach wenigen Sekunden, weil kein Akku angeschlossen ist – das ist völlig normal!
 
 2. **IP-Adresse sofort ablesen (Serieller Monitor):**
    * Öffne in der Arduino IDE oben rechts die Lupe (**Serieller Monitor**).

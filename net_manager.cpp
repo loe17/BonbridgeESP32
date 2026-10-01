@@ -153,6 +153,7 @@ void NetManager::startWifi() {
         Serial.println("[NETZWERK] Kein LAN-Kabel gesteckt und keine WLAN-Daten im Speicher.");
         Serial.println("[WLAN-HOTSPOT] Starte Einrichtungs-Hotspot: 'Bonbridge-Setup'");
         WiFi.mode(WIFI_AP);
+        WiFi.setTxPower(WIFI_POWER_15dBm);
         WiFi.softAP("Bonbridge-Setup");
         Serial.print("[WLAN-HOTSPOT] Hotspot IP-Adresse: ");
         Serial.println(WiFi.softAPIP());
@@ -216,6 +217,7 @@ void NetManager::checkConnections() {
             Serial.println("==================================================");
             Serial.println();
             WiFi.mode(WIFI_AP_STA);
+            WiFi.setTxPower(WIFI_POWER_15dBm);
             WiFi.softAP("Bonbridge-Setup");
             Serial.print("[WLAN-HOTSPOT] Hotspot IP: ");
             Serial.println(WiFi.softAPIP());

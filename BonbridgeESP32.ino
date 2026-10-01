@@ -10,24 +10,37 @@
 #include <esp_system.h>
 #include "soc/rtc_cntl_struct.h"
 
+#include <driver/usb_serial_jtag.h>
+
 static const char* TAG = "Main";
 
 static unsigned long lastHeartbeatMs = 0;
 static bool ledState = false;
 
-static void setStatusLed(bool on) {
-    if (on) {
-        rgbLedWrite(48, 0, 255, 200); // Helles Cyan fuer WS2812 an GPIO 48
+// Status-LED Ansteuerung (WS2812 RGB an GPIO 48 auf ESP32-S3 SuperMini)
+static void setStatusLed(bool heartbeat) {
+    if (NetManager::instance().isWifiConnected() || NetManager::instance().isEthernetLinkUp()) {
+        // Online: Sanftes, klares Gruen mit Herzschlag-Puls
+        if (heartbeat) {
+            rgbLedWrite(48, 0, 180, 40);
+        } else {
+            rgbLedWrite(48, 0, 25, 5);
+        }
+    } else if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+        // Hotspot 'Bonbridge-Setup' aktiv: Blau
+        if (heartbeat) {
+            rgbLedWrite(48, 0, 50, 220);
+        } else {
+            rgbLedWrite(48, 0, 5, 40);
+        }
     } else {
-        rgbLedWrite(48, 0, 0, 0);     // Aus
+        // Verbindung wird gesucht / Offline: Gelb/Orange blinken
+        if (heartbeat) {
+            rgbLedWrite(48, 180, 80, 0);
+        } else {
+            rgbLedWrite(48, 0, 0, 0);
+        }
     }
-
-    // Falls es eine normale LED ist (verschiedene Pins getestet)
-    digitalWrite(48, on ? HIGH : LOW);
-    digitalWrite(47, on ? HIGH : LOW);
-    digitalWrite(21, on ? HIGH : LOW);
-    digitalWrite(8, on ? HIGH : LOW);
-    digitalWrite(1, on ? HIGH : LOW);
 }
 
 void setup() {
@@ -36,29 +49,28 @@ void setup() {
     RTCCNTL.brown_out.rst_ena = 0;
     RTCCNTL.brown_out.ana_rst_en = 0;
 
+    // 1. Serielle Schnittstelle ohne Blockieren (Timeout = 0)
+    // Wenn das Board an einem 5V-Netzteil betrieben wird (ohne PC), darf Serial.print
+    // niemals auf einen Computer warten oder das System einfrieren!
+    Serial.setTxTimeoutMs(0);
     Serial.begin(115200);
+    Serial.setTxTimeoutMs(0);
 
     // Startgrund fuer Diagnose und WebUI erfassen
     esp_reset_reason_t resetReason = esp_reset_reason();
     WebUI::instance().setResetReason((uint8_t)resetReason);
 
-    // Bis zu 2 Sekunden warten, falls der USB-Serielle-Monitor verbunden wird
-    unsigned long startWait = millis();
-    while (!Serial && (millis() - startWait < 2000)) {
-        delay(10);
+    // Nur auf den seriellen Monitor warten, wenn tatsaechlich ein PC am USB-Port angeschlossen ist
+    if (usb_serial_jtag_is_connected()) {
+        unsigned long startWait = millis();
+        while (!Serial && (millis() - startWait < 1500)) {
+            delay(10);
+        }
     }
 
-    pinMode(48, OUTPUT);
-    pinMode(47, OUTPUT);
-    pinMode(21, OUTPUT);
-    pinMode(8, OUTPUT);
-    pinMode(1, OUTPUT);
-
-    // Deutliches Farbsignal beim Einschalten (Rot -> Gruen -> Blau)
-    rgbLedWrite(48, 255, 0, 0); delay(120);
-    rgbLedWrite(48, 0, 255, 0); delay(120);
-    rgbLedWrite(48, 0, 0, 255); delay(120);
-    setStatusLed(false);
+    // Sofortige optische Bestaetigung beim Einschalten:
+    // Violett signalisiert sofort: Strom ist da, ESP32-Prozessor laeuft!
+    rgbLedWrite(48, 120, 0, 120);
 
     Serial.println();
     Serial.println("==================================================");
@@ -75,21 +87,21 @@ void setup() {
     }
     Serial.println("[START] Lade Konfiguration aus dem Speicher...");
 
-    // 1. Einstellungen aus dem Speicher laden
+    // 2. Einstellungen aus dem Speicher laden
     ConfigManager::instance().begin();
     AppConfig& conf = ConfigManager::instance().get();
 
     Serial.println("[START] Initialisiere Netzwerk (LAN & WLAN)...");
-    // 2. Netzwerk-Steuerung starten (W5500 LAN hat Vorrang, WLAN als Ersatz)
+    // 3. Netzwerk-Steuerung starten (W5500 LAN hat Vorrang, WLAN als Ersatz)
     NetManager::instance().begin();
 
-    // 3. Port 9100 RAW Server starten (Nimmt Druckdaten vom Kassensystem an)
+    // 4. Port 9100 RAW Server starten (Nimmt Druckdaten vom Kassensystem an)
     RawServer::instance().begin(conf.port9100);
 
-    // 4. Sparsame Web-Oberfläche starten
+    // 5. Sparsame Web-Oberfläche starten
     WebUI::instance().begin(80);
 
-    // 5. Netzwerk-Wächter aktivieren
+    // 6. Netzwerk-Wächter aktivieren
     NetWatch::instance().begin();
 
     Serial.println("[START] System betriebsbereit.");
@@ -111,9 +123,9 @@ void loop() {
 
     // 3. USB-Drucker Status überwachen:
     // USB-Host wird erst gestartet, wenn die Netzwerk-Verbindung (WLAN oder LAN) steht
-    // oder der Einrichtungs-Hotspot aktiv ist (bzw. 15s Sicherheits-Fallback).
+    // oder der Einrichtungs-Hotspot aktiv ist.
     // So kann die WLAN-Verbindung und DHCP-Zuweisung absolut ungestoert ablaufen!
-    if (NetManager::instance().isOnline() || now > 15000) {
+    if (NetManager::instance().isOnline()) {
         UsbPrinter::instance().update();
     }
 
