@@ -17,28 +17,34 @@ static const char* TAG = "Main";
 static unsigned long lastHeartbeatMs = 0;
 static bool ledState = false;
 
-// Status-LED Ansteuerung (WS2812 RGB an GPIO 48 auf ESP32-S3 SuperMini)
+// Status-LED Ansteuerung (WS2812 RGB an GPIO 48 / 38 auf ESP32-S3)
 static void setStatusLed(bool heartbeat) {
     if (NetManager::instance().isWifiConnected() || NetManager::instance().isEthernetLinkUp()) {
         // Online: Sanftes, klares Gruen mit Herzschlag-Puls
         if (heartbeat) {
             rgbLedWrite(48, 0, 180, 40);
+            rgbLedWrite(38, 0, 180, 40);
         } else {
             rgbLedWrite(48, 0, 25, 5);
+            rgbLedWrite(38, 0, 25, 5);
         }
     } else if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
         // Hotspot 'Bonbridge-Setup' aktiv: Blau
         if (heartbeat) {
             rgbLedWrite(48, 0, 50, 220);
+            rgbLedWrite(38, 0, 50, 220);
         } else {
             rgbLedWrite(48, 0, 5, 40);
+            rgbLedWrite(38, 0, 5, 40);
         }
     } else {
         // Verbindung wird gesucht / Offline: Gelb/Orange blinken
         if (heartbeat) {
             rgbLedWrite(48, 180, 80, 0);
+            rgbLedWrite(38, 180, 80, 0);
         } else {
             rgbLedWrite(48, 0, 0, 0);
+            rgbLedWrite(38, 0, 0, 0);
         }
     }
 }
@@ -52,25 +58,32 @@ void setup() {
     // 1. Serielle Schnittstelle ohne Blockieren (Timeout = 0)
     // Wenn das Board an einem 5V-Netzteil betrieben wird (ohne PC), darf Serial.print
     // niemals auf einen Computer warten oder das System einfrieren!
+#if ARDUINO_USB_CDC_ON_BOOT
     Serial.setTxTimeoutMs(0);
+#endif
     Serial.begin(115200);
+#if ARDUINO_USB_CDC_ON_BOOT
     Serial.setTxTimeoutMs(0);
+#endif
 
     // Startgrund fuer Diagnose und WebUI erfassen
     esp_reset_reason_t resetReason = esp_reset_reason();
     WebUI::instance().setResetReason((uint8_t)resetReason);
 
+#if ARDUINO_USB_CDC_ON_BOOT
     // Nur auf den seriellen Monitor warten, wenn tatsaechlich ein PC am USB-Port angeschlossen ist
     if (usb_serial_jtag_is_connected()) {
         unsigned long startWait = millis();
-        while (!Serial && (millis() - startWait < 1500)) {
+        while (!Serial && (millis() - startWait < 500)) {
             delay(10);
         }
     }
+#endif
 
     // Sofortige optische Bestaetigung beim Einschalten:
     // Violett signalisiert sofort: Strom ist da, ESP32-Prozessor laeuft!
     rgbLedWrite(48, 120, 0, 120);
+    rgbLedWrite(38, 120, 0, 120);
 
     Serial.println();
     Serial.println("==================================================");
