@@ -11,7 +11,7 @@ enum OtaState {
     OTA_STATE_ERROR = 5
 };
 
-#define BONBRIDGE_FIRMWARE_VERSION "v1.1.0"
+#define BONBRIDGE_FIRMWARE_VERSION "v1.2.0"
 
 class OtaUpdater {
 public:

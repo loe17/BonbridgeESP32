@@ -80,22 +80,97 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 | **INT** | **GPIO 14** | Unterbrechungssignal |
 | **RST** | **GPIO 13** | Rücksetzleitung (Reset) |
 
-### 3. USB-Buchse (Drucker-Anschluss)
-| USB-Buchse | ESP32-S3 Pin |
-|---|---|
-| **D-** (Weiß) | **GPIO 19** |
-| **D+** (Grün) | **GPIO 20** |
-| **+5V** (Rot) | **5V Stromversorgung** |
-| **GND** (Schwarz) | **GND** |
+### 3. USB-Drucker-Anschluss (2 Optionen)
 
-> [!IMPORTANT]
-> **Wichtig – Keinen USB-C-Hub verwenden:**
-> Ein USB-Hub (Mehrfachverteiler) besitzt einen eigenen Steuerchip und verhindert, dass der ESP32-S3 den Drucker erkennt. Verwende stattdessen einen einfachen **USB-OTG-Adapter** (USB-C auf USB-A) oder ein **OTG-Y-Kabel** mit direkter Stromeinspeisung.
+#### Option A: Standard-Anschluss per USB-OTG-Adapter (Extern)
+* Am USB-C-Port des ESP32 wird ein einfacher **USB-OTG-Adapter (USB-C auf USB-A)** angeschlossen.
+* Der Drucker wird mit seinem normalen Druckerkabel (USB-A auf USB-B) in den Adapter gesteckt.
+* *Wichtig: Keinen USB-Hub verwenden!*
+
+#### Option B: Direktverdrahtung & Festeinbau (Epson TM-T88 & diymore ESP32-S3)
+Wer eine professionelle, kompakte Lösung ohne Adapter und ohne außen liegenden Kabelsalat möchte, kann das **diymore ESP32-S3 Entwicklungsboard** direkt mit den 4 Pins der USB-B-Buchse des Epson TM-T88 verbinden und das Board unsichtbar im Druckergehäuse integrieren.
+
+##### Warum funktioniert das direkt an den Stiftleisten-Pins?
+Der ESP32-S3 verfügt über einen internen USB-OTG-Controller, dessen Datenleitungen fest auf die GPIO-Pins herausgeführt sind:
+* **GPIO 19** ist hardwaremäßig direkt mit **USB D-** verbunden.
+* **GPIO 20** ist hardwaremäßig direkt mit **USB D+** verbunden.
+
+##### Abbildung 1: Pinbelegung der USB-B-Buchse (Epson TM-T88)
+Ansicht der USB-B-Buchse auf der Druckerplatine (von hinten / Lötseite):
+```text
+            ┌───────────────┐
+            │   [2]   [1]   │     Pin 1 = VBUS (+5V)   --> Rote Ader
+            │               │     Pin 2 = D- (Data -)  --> Weiße Ader
+            │   [3]   [4]   │     Pin 3 = D+ (Data +)  --> Grüne Ader
+            └───┬───────┬───┘     Pin 4 = GND (Masse)  --> Schwarze Ader
+                │ Shield│
+                └───────┘
+```
+> [!TIP]
+> **Identifikation mit dem Multimeter:** Das metallene Abschirmgehäuse der USB-B-Buchse ist immer mit **GND** verbunden. Halte eine Prüfspitze an das Metallgehäuse und teste mit dem Durchgangsprüfer (Piepser) die 4 Pins: Nur **Pin 4** hat Durchgang zu GND. Damit weißt du sofort, wie die Buchse ausgerichtet ist!
+
+##### Abbildung 2: Verdrahtungsschema zwischen Epson TM-T88 und diymore ESP32-S3
+```text
+Epson TM-T88 Platine (USB-B Buchse)              diymore ESP32-S3 Board
+┌─────────────────────────────────┐              ┌───────────────────────────┐
+│ Pin 1: VBUS (+5V) ──────────────┼──[ Rot ]─────┼─► Pin 5V (oder VIN)       │
+│ Pin 2: D- (Data Minus) ─────────┼──[ Weiß ]────┼─► Pin GPIO 19             │
+│ Pin 3: D+ (Data Plus) ──────────┼──[ Grün ]────┼─► Pin GPIO 20             │
+│ Pin 4: GND (Masse) ─────────────┼──[ Schwarz ]─┼─► Pin GND                 │
+└─────────────────────────────────┘              └───────────────────────────┘
+```
+
+```mermaid
+graph LR
+    subgraph Epson ["Epson TM-T88 (USB-B Buchse)"]
+        P1["Pin 1: VBUS (+5V)"]
+        P2["Pin 2: D- (Data -)"]
+        P3["Pin 3: D+ (Data +)"]
+        P4["Pin 4: GND (Masse)"]
+    end
+
+    subgraph ESP ["diymore ESP32-S3"]
+        V5["Pin 5V / VIN"]
+        G19["Pin GPIO 19 (D-)"]
+        G20["Pin GPIO 20 (D+)"]
+        GND["Pin GND (Masse)"]
+    end
+
+    P1 -- "Rote Ader" --> V5
+    P2 -- "Weiße Ader" --> G19
+    P3 -- "Grüne Ader" --> G20
+    P4 -- "Schwarze Ader" --> GND
+```
+
+##### Abbildung 3: All-in-One Festeinbau mit interner Stromversorgung (1 Netzteil für alles!)
+Der Epson TM-T88 arbeitet intern mit einem 24V-Netzteil. Mit einem kleinen 24V-auf-5V-Abwärtswandler (Step-Down-Modul, z. B. MP1584EN oder LM2596 für ca. 1–2 €) kann der ESP32 direkt aus dem Drucker versorgt werden:
+
+```text
+                          ┌────────────────────────┐
+   Epson 24V Netzteil ───►│ Epson TM-T88 Elektronik│
+                          └──┬──────────────────┬──┘
+                  +24V DC    │                  │  USB-B Pins (1, 2, 3, 4)
+                  & GND      │                  │  (VBUS, D-, D+, GND)
+                             ▼                  │
+                   ┌──────────────────┐         │
+                   │ Step-Down-Modul  │         │
+                   │  (24V -> 5.0V)   │         │
+                   └─────────┬────────┘         │
+                      +5.0V  │                  │
+                      & GND  ▼                  ▼
+                   ┌───────────────────────────────┐
+                   │    diymore ESP32-S3 Board     │
+                   │ (Pins: 5V, GND, GPIO 19 & 20) │
+                   └───────────────────────────────┘
+```
+
+> [!WARNING]
+> **Achtung Spannung:** Der ESP32 verträgt am 5V-Pin maximal 5,0 bis 5,2 Volt. Verbinde niemals die 24V des Druckers direkt mit dem ESP32! Stelle den Step-Down-Wandler vor dem Anschließen mit einem Multimeter exakt auf 5,0V ein.
 
 > [!NOTE]
 > **Betrieb am Computer vs. Drucker-Betrieb:**
 > * **Am Computer angeschlossen (USB-Kabel zum PC):** Der ESP32 erkennt die PC-Verbindung automatisch. Der USB-Druckermodus wird pausiert, damit der serielle Monitor und die Programmierung stabil funktionieren. Die Web-Oberfläche und das Netzwerk laufen uneingeschränkt.
-> * **Im Kassen-/Drucker-Betrieb:** Betreibe das Board an einem 5V-Netzteil (z. B. 5V/GND-Pins oder zweiter Anschluss). Der Drucker wird direkt über einen einfachen USB-OTG-Adapter (USB-C auf USB-A) angesteckt.
+> * **Im Kassen-/Drucker-Betrieb:** Betreibe das Board an einem 5V-Netzteil (z. B. 5V/GND-Pins oder interner Step-Down-Wandler). Der Drucker wird entweder über den USB-OTG-Adapter oder direkt über die Pins GPIO 19 & 20 angesteuert.
 
 ---
 
