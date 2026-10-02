@@ -198,19 +198,20 @@ void NetManager::reloadWifiConfig() {
 }
 
 void NetManager::checkConnections() {
-    // Wenn WLAN-Verbindung versucht wird, aber nach 12s oder 4 Fehlversuchen nicht klappt
+    // Wenn WLAN-Verbindung versucht wird, aber nach 6s oder 2 Fehlversuchen nicht klappt:
+    // Sofort Hotspot aufspannen!
     if (wifiAttemptActive && !wifiConnected && !ethLinkUp) {
-        if ((millis() - wifiConnectStartMs > 12000) || disconnectCount >= 4) {
+        if ((millis() - wifiConnectStartMs > 6000) || disconnectCount >= 2) {
             if (connectState == WIFI_STATE_CONNECTING) {
                 connectState = WIFI_STATE_FAILED;
                 if (lastConnectError.length() == 0) {
-                    lastConnectError = "Keine Verbindung moeglich (Zeitueberschreitung)";
+                    lastConnectError = "Keine Verbindung zum WLAN-Router (Zeitueberschreitung)";
                 }
             }
             Serial.println();
             Serial.println("==================================================");
             Serial.println("[WLAN-HINWEIS] Verbindung zum WLAN-Router nicht moeglich.");
-            Serial.println("[WLAN-HOTSPOT] Eigener Einrichtungs-Hotspot wird zusaetzlich gestartet!");
+            Serial.println("[WLAN-HOTSPOT] Eigener Einrichtungs-Hotspot wird gestartet!");
             Serial.println("  Name (SSID): Bonbridge-Setup");
             Serial.println("  Passwort   : keines (offen)");
             Serial.println("  Web-Menue  : http://192.168.4.1");
@@ -222,6 +223,7 @@ void NetManager::checkConnections() {
             Serial.print("[WLAN-HOTSPOT] Hotspot IP: ");
             Serial.println(WiFi.softAPIP());
             wifiAttemptActive = false;
+            currentMode = NET_MODE_WIFI;
         }
     }
 
@@ -249,6 +251,9 @@ void NetManager::checkConnections() {
     // Wenn kein LAN da ist, prüfen wir den WLAN-Status
     if (WiFi.status() == WL_CONNECTED) {
         wifiConnected = true;
+        currentMode = NET_MODE_WIFI;
+    } else if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+        wifiConnected = false;
         currentMode = NET_MODE_WIFI;
     } else {
         wifiConnected = false;

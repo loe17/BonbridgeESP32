@@ -48,6 +48,14 @@ static void usb_client_task(void *pvParameters) {
     }
 }
 
+#if CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK
+static bool enumFilter(const usb_device_desc_t *dev_desc, uint8_t *bConfigurationValue) {
+    (void)dev_desc;
+    *bConfigurationValue = 1;
+    return true;
+}
+#endif
+
 UsbPrinter::UsbPrinter() :
     initialized(false),
     pcConnectedMode(false),
@@ -88,24 +96,18 @@ bool UsbPrinter::begin() {
     Serial.flush();
     delay(20);
 
-    // Internen USB-PHY direkt fuer USB-Host (OTG) konfigurieren
-    RTCCNTL.usb_conf.sw_hw_usb_phy_sel = 1;
-    RTCCNTL.usb_conf.sw_usb_phy_sel = 1;
-    USB_WRAP.otg_conf.phy_sel = 0;        // 0 = interner PHY
-    USB_WRAP.otg_conf.pad_enable = 1;     // USB-Pads aktivieren
-    USB_WRAP.otg_conf.ahb_clk_force_on = 1;
-    USB_WRAP.otg_conf.phy_clk_force_on = 1;
-
-    const usb_host_config_t host_config = {
-        .skip_phy_setup = true,           // Eigene PHY-Konfiguration verwenden, vermeidet ESP-IDF Abort
-        .root_port_unpowered = false,
-        .intr_flags = ESP_INTR_FLAG_LEVEL1,
-        .enum_filter_cb = NULL,
-    };
+    usb_host_config_t host_config = {};
+    host_config.skip_phy_setup = false;
+    host_config.intr_flags = ESP_INTR_FLAG_LEVEL1;
+#if CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK
+    host_config.enum_filter_cb = enumFilter;
+#endif
     esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "usb_host_install fehlgeschlagen: %s", esp_err_to_name(err));
+        Serial.printf("[USB-WARNUNG] USB-Host konnte nicht gestartet werden: %s\n", esp_err_to_name(err));
+        Serial.println("[USB-HINWEIS] System laeuft stabil weiter (Netzwerk & Web-Menue aktiv).");
         initialized = true;
+        deviceName = "USB-Host nicht aktiv";
         return false;
     }
 

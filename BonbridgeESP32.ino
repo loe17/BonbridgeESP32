@@ -120,6 +120,9 @@ void setup() {
     Serial.println("[START] System betriebsbereit.");
     Serial.println("==================================================");
     Serial.println();
+
+    // Sofortige optische Status-Anzeige
+    setStatusLed(true);
 }
 
 void loop() {
@@ -136,9 +139,9 @@ void loop() {
 
     // 3. USB-Drucker Status überwachen:
     // USB-Host wird erst gestartet, wenn die Netzwerk-Verbindung (WLAN oder LAN) steht
-    // oder der Einrichtungs-Hotspot aktiv ist.
-    // So kann die WLAN-Verbindung und DHCP-Zuweisung absolut ungestoert ablaufen!
-    if (NetManager::instance().isOnline()) {
+    // oder der Einrichtungs-Hotspot aktiv ist - und fruehestens 5 Sekunden nach dem Einschalten,
+    // damit die gesamte Netzwerk- und Web-Schnittstelle voellig ungestoert hochfahren kann!
+    if (millis() > 5000 && NetManager::instance().isOnline()) {
         UsbPrinter::instance().update();
     }
 
