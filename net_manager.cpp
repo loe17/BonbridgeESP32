@@ -83,6 +83,7 @@ static void onWiFiEthEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
 
 NetManager::NetManager() :
     currentMode(NET_MODE_NONE),
+    ethHardwarePresent(false),
     ethLinkUp(false),
     wifiConnected(false),
     lastCheckMs(0),
@@ -152,9 +153,11 @@ void NetManager::initEthernet() {
     if (chipId != 0x04) {
         Serial.printf("[NETZWERK] Kein W5500 SPI-LAN Modul erkannt (Antwort: 0x%02X). Verwende WLAN.\n", chipId);
         ethLinkUp = false;
+        ethHardwarePresent = false;
         return;
     }
 
+    ethHardwarePresent = true;
     ESP_LOGI(TAG, "W5500 LAN-Modul gefunden (ID 0x%02X). Starte Ethernet...", chipId);
     #if defined(ETH_PHY_W5500)
     ETH.begin(ETH_PHY_W5500, 1, DEFAULT_ETH_CS, DEFAULT_ETH_INT, DEFAULT_ETH_RST, SPI);
@@ -168,11 +171,15 @@ void NetManager::startWifi() {
     if (conf.wifi_ssid.length() == 0) {
         Serial.println("[NETZWERK] Kein LAN-Kabel gesteckt und keine WLAN-Daten im Speicher.");
         Serial.println("[WLAN-HOTSPOT] Starte Einrichtungs-Hotspot: 'Bonbridge-Setup'");
-        WiFi.disconnect(true);
+        WiFi.disconnect(false);
         delay(50);
         WiFi.mode(WIFI_AP);
-        WiFi.setTxPower(WIFI_POWER_15dBm);
-        WiFi.softAP("Bonbridge-Setup");
+        WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
+        bool apStarted = WiFi.softAP("Bonbridge-Setup");
+        if (!apStarted) {
+            delay(100);
+            WiFi.softAP("Bonbridge-Setup");
+        }
         Serial.print("[WLAN-HOTSPOT] Hotspot IP-Adresse: ");
         Serial.println(WiFi.softAPIP());
         Serial.println("[WLAN-HOTSPOT] Verbinde dich mit 'Bonbridge-Setup' und oeffne http://192.168.4.1 im Browser.");
@@ -190,7 +197,6 @@ void NetManager::startWifi() {
     WiFi.mode(WIFI_STA);
     WiFi.setHostname("BonbridgeESP32");
     WiFi.setAutoReconnect(true);
-    WiFi.setTxPower(WIFI_POWER_15dBm);
     WiFi.begin(conf.wifi_ssid.c_str(), conf.wifi_password.c_str());
     wifiAttemptActive = true;
     wifiConnectStartMs = millis();
@@ -234,12 +240,17 @@ void NetManager::checkConnections() {
             Serial.println("==================================================");
             Serial.println();
 
-            // Blockierenden STA-Verbindungsversuch stoppen, damit Hotspot sofort sendet!
-            WiFi.disconnect(true);
+            // Blockierenden STA-Verbindungsversuch stoppen (false = Wi-Fi Hardware bleibt an!)
+            WiFi.disconnect(false);
             delay(50);
             WiFi.mode(WIFI_AP);
-            WiFi.setTxPower(WIFI_POWER_15dBm);
-            WiFi.softAP("Bonbridge-Setup");
+            WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
+            bool apStarted = WiFi.softAP("Bonbridge-Setup");
+            if (!apStarted) {
+                Serial.println("[WLAN-HOTSPOT] Fehler beim Start, wiederhole...");
+                delay(100);
+                WiFi.softAP("Bonbridge-Setup");
+            }
             Serial.print("[WLAN-HOTSPOT] Hotspot IP: ");
             Serial.println(WiFi.softAPIP());
             wifiAttemptActive = false;
@@ -248,7 +259,7 @@ void NetManager::checkConnections() {
     }
 
     // Prüfe Link-Status des W5500
-    bool currentEthLink = ETH.linkUp();
+    bool currentEthLink = ethHardwarePresent ? ETH.linkUp() : false;
 
     if (currentEthLink != ethLinkUp) {
         ethLinkUp = currentEthLink;

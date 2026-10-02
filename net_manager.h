@@ -58,6 +58,7 @@ private:
     NetManager();
 
     NetActiveMode currentMode;
+    bool ethHardwarePresent;
     bool ethLinkUp;
     bool wifiConnected;
     unsigned long lastCheckMs;
