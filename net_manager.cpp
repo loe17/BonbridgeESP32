@@ -135,14 +135,30 @@ void NetManager::begin() {
 }
 
 void NetManager::initEthernet() {
-    ESP_LOGI(TAG, "Initialisiere W5500 SPI Ethernet...");
+    pinMode(DEFAULT_ETH_CS, OUTPUT);
+    digitalWrite(DEFAULT_ETH_CS, HIGH);
+    pinMode(DEFAULT_ETH_INT, INPUT_PULLUP); // Schützt vor Floating-Interrupts
+
     SPI.begin(DEFAULT_ETH_SCLK, DEFAULT_ETH_MISO, DEFAULT_ETH_MOSI);
 
-    // Initialisierung des W5500 SPI Ethernet Treibers
+    // Teste, ob ein W5500 auf dem SPI-Bus antwortet (VERSIONR Register 0x0039)
+    digitalWrite(DEFAULT_ETH_CS, LOW);
+    SPI.transfer(0x00);
+    SPI.transfer(0x39);
+    SPI.transfer(0x00);
+    uint8_t chipId = SPI.transfer(0x00);
+    digitalWrite(DEFAULT_ETH_CS, HIGH);
+
+    if (chipId != 0x04) {
+        Serial.printf("[NETZWERK] Kein W5500 SPI-LAN Modul erkannt (Antwort: 0x%02X). Verwende WLAN.\n", chipId);
+        ethLinkUp = false;
+        return;
+    }
+
+    ESP_LOGI(TAG, "W5500 LAN-Modul gefunden (ID 0x%02X). Starte Ethernet...", chipId);
     #if defined(ETH_PHY_W5500)
     ETH.begin(ETH_PHY_W5500, 1, DEFAULT_ETH_CS, DEFAULT_ETH_INT, DEFAULT_ETH_RST, SPI);
     #else
-    // Fallback falls Kern-Definition abweicht
     ETH.begin();
     #endif
 }
@@ -152,6 +168,8 @@ void NetManager::startWifi() {
     if (conf.wifi_ssid.length() == 0) {
         Serial.println("[NETZWERK] Kein LAN-Kabel gesteckt und keine WLAN-Daten im Speicher.");
         Serial.println("[WLAN-HOTSPOT] Starte Einrichtungs-Hotspot: 'Bonbridge-Setup'");
+        WiFi.disconnect(true);
+        delay(50);
         WiFi.mode(WIFI_AP);
         WiFi.setTxPower(WIFI_POWER_15dBm);
         WiFi.softAP("Bonbridge-Setup");
@@ -198,26 +216,28 @@ void NetManager::reloadWifiConfig() {
 }
 
 void NetManager::checkConnections() {
-    // Wenn WLAN-Verbindung versucht wird, aber nach 6s oder 2 Fehlversuchen nicht klappt:
+    // Wenn WLAN-Verbindung versucht wird, aber nach 5s oder 2 Fehlversuchen nicht klappt:
     // Sofort Hotspot aufspannen!
     if (wifiAttemptActive && !wifiConnected && !ethLinkUp) {
-        if ((millis() - wifiConnectStartMs > 6000) || disconnectCount >= 2) {
-            if (connectState == WIFI_STATE_CONNECTING) {
-                connectState = WIFI_STATE_FAILED;
-                if (lastConnectError.length() == 0) {
-                    lastConnectError = "Keine Verbindung zum WLAN-Router (Zeitueberschreitung)";
-                }
+        if ((millis() - wifiConnectStartMs > 5000) || disconnectCount >= 2) {
+            connectState = WIFI_STATE_FAILED;
+            if (lastConnectError.length() == 0) {
+                lastConnectError = "Keine Verbindung zum WLAN-Router (Timeout)";
             }
             Serial.println();
             Serial.println("==================================================");
             Serial.println("[WLAN-HINWEIS] Verbindung zum WLAN-Router nicht moeglich.");
-            Serial.println("[WLAN-HOTSPOT] Eigener Einrichtungs-Hotspot wird gestartet!");
+            Serial.println("[WLAN-HOTSPOT] Starte Einrichtungs-Hotspot: 'Bonbridge-Setup'");
             Serial.println("  Name (SSID): Bonbridge-Setup");
             Serial.println("  Passwort   : keines (offen)");
             Serial.println("  Web-Menue  : http://192.168.4.1");
             Serial.println("==================================================");
             Serial.println();
-            WiFi.mode(WIFI_AP_STA);
+
+            // Blockierenden STA-Verbindungsversuch stoppen, damit Hotspot sofort sendet!
+            WiFi.disconnect(true);
+            delay(50);
+            WiFi.mode(WIFI_AP);
             WiFi.setTxPower(WIFI_POWER_15dBm);
             WiFi.softAP("Bonbridge-Setup");
             Serial.print("[WLAN-HOTSPOT] Hotspot IP: ");

@@ -17,7 +17,7 @@ static const char* TAG = "Main";
 static unsigned long lastHeartbeatMs = 0;
 static bool ledState = false;
 
-// Status-LED Ansteuerung (WS2812 RGB an GPIO 48 / 38 auf ESP32-S3)
+// Status-LED Ansteuerung (WS2812 RGB an GPIO 48 / 38 sowie Standard-LEDs an GPIO 21, 47, 2)
 static void setStatusLed(bool heartbeat) {
     if (NetManager::instance().isWifiConnected() || NetManager::instance().isEthernetLinkUp()) {
         // Online: Sanftes, klares Gruen mit Herzschlag-Puls
@@ -47,14 +47,21 @@ static void setStatusLed(bool heartbeat) {
             rgbLedWrite(38, 0, 0, 0);
         }
     }
+
+    // Standard-Digital-LEDs schalten (fuer Boards mit normaler LED, z. B. Super Mini oder DevKit)
+    pinMode(21, OUTPUT);
+    digitalWrite(21, heartbeat ? HIGH : LOW);
+    pinMode(47, OUTPUT);
+    digitalWrite(47, heartbeat ? HIGH : LOW);
+    pinMode(2, OUTPUT);
+    digitalWrite(2, heartbeat ? HIGH : LOW);
+#ifdef LED_BUILTIN
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, heartbeat ? HIGH : LOW);
+#endif
 }
 
 void setup() {
-    // 0. Hardware-Brownout-Reset entschaerfen (verhindert Endlos-Reboot-Schleifen bei 
-    // kurzzeitigen Millisekunden-Spannungseinbruechen waehrend WLAN-Funkspitzen)
-    RTCCNTL.brown_out.rst_ena = 0;
-    RTCCNTL.brown_out.ana_rst_en = 0;
-
     // 1. Serielle Schnittstelle ohne Blockieren (Timeout = 0)
     // Wenn das Board an einem 5V-Netzteil betrieben wird (ohne PC), darf Serial.print
     // niemals auf einen Computer warten oder das System einfrieren!
@@ -138,10 +145,10 @@ void loop() {
     NetManager::instance().update();
 
     // 3. USB-Drucker Status überwachen:
-    // USB-Host wird erst gestartet, wenn die Netzwerk-Verbindung (WLAN oder LAN) steht
-    // oder der Einrichtungs-Hotspot aktiv ist - und fruehestens 5 Sekunden nach dem Einschalten,
-    // damit die gesamte Netzwerk- und Web-Schnittstelle voellig ungestoert hochfahren kann!
-    if (millis() > 5000 && NetManager::instance().isOnline()) {
+    // USB-Host wird erst gestartet, wenn eine echte Netzwerk-Verbindung (WLAN zum Router oder LAN-Kabel) steht
+    // und mindestens 8 Sekunden vergangen sind.
+    // Im Einrichtungs-Hotspot-Modus bleibt der USB-Host pausiert, damit die Konfiguration 100% stabil ist!
+    if (millis() > 8000 && (NetManager::instance().isWifiConnected() || NetManager::instance().isEthernetLinkUp())) {
         UsbPrinter::instance().update();
     }
 
