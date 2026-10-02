@@ -174,6 +174,7 @@ void NetManager::startWifi() {
         WiFi.disconnect(false);
         delay(50);
         WiFi.mode(WIFI_AP);
+        WiFi.setTxPower(WIFI_POWER_15dBm);
         WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
         bool apStarted = WiFi.softAP("Bonbridge-Setup");
         if (!apStarted) {
@@ -197,6 +198,7 @@ void NetManager::startWifi() {
     WiFi.mode(WIFI_STA);
     WiFi.setHostname("BonbridgeESP32");
     WiFi.setAutoReconnect(true);
+    WiFi.setTxPower(WIFI_POWER_15dBm);
     WiFi.begin(conf.wifi_ssid.c_str(), conf.wifi_password.c_str());
     wifiAttemptActive = true;
     wifiConnectStartMs = millis();
@@ -244,6 +246,7 @@ void NetManager::checkConnections() {
             WiFi.disconnect(false);
             delay(50);
             WiFi.mode(WIFI_AP);
+            WiFi.setTxPower(WIFI_POWER_15dBm);
             WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
             bool apStarted = WiFi.softAP("Bonbridge-Setup");
             if (!apStarted) {

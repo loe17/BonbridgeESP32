@@ -9,6 +9,7 @@
 #include <esp_log.h>
 #include <esp_system.h>
 #include "soc/rtc_cntl_struct.h"
+#include "hal/brownout_ll.h"
 
 #include <driver/usb_serial_jtag.h>
 
@@ -62,6 +63,10 @@ static void setStatusLed(bool heartbeat) {
 }
 
 void setup() {
+    // 0. Hardware-Brownout-Reset entschaerfen (verhindert staendige Neustarts bei Millisekunden-Spannungseinbruechen an 5V)
+    brownout_ll_bod_enable(false);
+    brownout_ll_ana_reset_enable(false);
+
     // 1. Serielle Schnittstelle ohne Blockieren (Timeout = 0)
     // Wenn das Board an einem 5V-Netzteil betrieben wird (ohne PC), darf Serial.print
     // niemals auf einen Computer warten oder das System einfrieren!
