@@ -7,36 +7,42 @@ Vollständige Anleitung und Projektdaten für eine maßgeschneiderte All-in-One-
 ## 1. Spezifikationen & Mechanik
 
 * **Abmessungen:** Exakt **55,0 mm × 25,0 mm** (mit abgerundeten Ecken $R = 2,0\text{ mm}$).
-* **Befestigung:** 4× M2,5-Montagebohrungen (Bohrung 2,7 mm, Kupfer-Pad 4,8 mm, mit Masse/GND verbunden).
+* **Befestigung:** 4× M2,5-Montagebohrungen (Bohrung 2,7 mm, Kupfer-Pad 4,4 mm, mit Masse/GND verbunden).
 * **Ausrichtung & Platzierung der Anschlüsse:**
-  * **Obere Längsseite (55 mm Kante, oben links):**
-    * **JST-XH 2-Pin (J3):** 24V Stromeingang vom internen Druckernetzteil (+24V, GND).
-    * **JST-XH 4-Pin (J4):** Direkt daneben: 4-Pin USB-Verbindung zum Drucker-Mainboard (+5V, D-, D+, GND).
-  * **Obere Längsseite (55 mm Kante, oben rechts):**
-    * **USB-C Buchse (J2):** Zum Programmieren/Flashen und Diagnose (öffnet nach oben).
-  * **Untere Längsseite (55 mm Kante, unten links/mitte):**
-    * **RJ45 MagJack (J1):** Netzwerkbuchse (10/100Mbit, öffnet nach unten, gegenüber von USB-C).
+  * **Untere Längsseite (55 mm Kante):**
+    * **RJ45 MagJack (J1):** Netzwerkbuchse (10/100Mbit mit Übertragern & LEDs). **Ragt 3,0 mm über den unteren Rand der Platine hinaus**, damit die Buchse bündig durch einen Gehäuseausschnitt geführt werden kann.
+  * **Obere Längsseite (55 mm Kante):**
+    * **JST-XH 2-Pin (J3, oben links):** 24V Stromeingang vom internen Druckernetzteil (+24V, GND).
+    * **JST-XH 4-Pin (J4, direkt neben J3):** 4-Pin USB-Verbindung zum Drucker-Mainboard (+5V, D-, D+, GND).
+    * **USB-C Buchse (J2, gegenüber RJ45):** Zum Programmieren/Flashen und Diagnose (öffnet nach oben).
 * **Externe Antenne:** Anschluss über integrierte **U.FL / IPEX Buchse** direkt auf dem ESP32-S3-WROOM-1U Modul.
 
 ---
 
-## 2. Abbildung: Platinen-Layout (55 mm × 25 mm)
+## 2. Platinen-Vorschau (3D-Render & Layout)
+
+![Board Vorschau Top](board_preview.png)
+*Draufsicht (Top View) des fertigen Platinen-Layouts (55 × 25 mm)*
+
+![Board Vorschau 3D](board_preview_3d.png)
+*3D-Isometrie-Ansicht mit 3 mm Überhang der RJ45-Buchse nach unten*
 
 ```text
        ┌─── 55 mm Längsseite (Oben) ──────────────────────────────────────┐
-       │ (H1)    [J3] 24V IN     [J4] PRINTER USB            [J2]   (H2)  │
-       │ M2.5    [+24V GND]     [+5V D- D+ GND]             USB-C   M2.5  │
-       │                                                    PROG          │
-       │                                     ┌─────────────┐              │
-       │ ┌──────────────┐    ┌───────────┐   │  ESP32-S3   │              │
-       │ │              │    │   W5500   │   │  WROOM-1U   │    [D1]      │
-       │ │ RJ45 MagJack │    │  QFN-48   │   │             │   WS2812B    │
-       │ │ (10/100Mbit) │    ├───────────┤   │ (IPEX Ant.) │     RGB      │
-       │ │              │    │  TPS54302 │   │             │              │
-       │ └──────────────┘    │ Step-Down │   └─────────────┘        (H4)  │
-       │ (H3)                └───────────┘                          M2.5  │
-       └─▼──▼──▼──▼───────────────────────────────────────────────────────┘
-          RJ45 Buchse öffnet nach UNTEN (Längsseite)
+       │ (H1)  [J3] 24V    [J4] PRINTER USB     [J2] PROG  ┌───────────┐  │
+       │ M2.5  [+24V G]    [+5V D- D+ GND]      USB-C      │           │  │
+       │                                        [U4] 3.3V  │           │  │
+       │ ┌────────────────┐                     ┌───────┐  │ ESP32-S3  │  │ (H2)
+       │ │                │                     │ W5500 │  │ WROOM-1U  │  │ M2.5
+       │ │  RJ45 MagJack  │                     │ QFN48 │  │           │  │
+       │ │  (10/100Mbit)  │                     └───────┘  │   [IPEX]  │ [D1]
+       │ │                │                     [U3]Buck   │   Ant.    │ RGB
+       │ └────────────────┘                                └───────────┘  │
+       │ (H3)                                                        (H4) │
+       │ M2.5                                                        M2.5 │
+       └───┬────────────┬─────────────────────────────────────────────────┘
+           │  RJ45 3mm  │ ◄─── Ragt 3,0 mm über den Rand (für Gehäuseausschnitt)
+           └────────────┘
 ```
 
 ---
@@ -47,7 +53,7 @@ Vollständige Anleitung und Projektdaten für eine maßgeschneiderte All-in-One-
 |---|---|---|---|
 | **U1 (MCU)** | **ESP32-S3-WROOM-1U-N8** | SMD-Modul (18×19,2 mm) | **Mit U.FL/IPEX-Buchse für externe Antenne.** Spart 6 mm Baulänge gegenüber der PCB-Antennen-Version! Voll CE/FCC-zertifiziert. |
 | **U2 (Ethernet)** | **WIZnet W5500** | QFN-48 (7×7 mm) | Hardware-TCP/IP-Chip. Wird über SPI mit dem ESP32 verbunden. |
-| **J1 (LAN-Buchse)**| **RJ45 MagJack (10/100M)** | THT (z.B. HanRun HR911105A / Amphenol) | Buchse mit **integrierten Übertragern** und Status-LEDs (Link/Act). Auf der unteren Längsseite platziert. |
+| **J1 (LAN-Buchse)**| **RJ45 MagJack (10/100M)** | THT (z.B. Amphenol RJMG1BD3B8K1ANR / HanRun HR911105A) | Buchse mit **integrierten Übertragern** und Status-LEDs. **Ragt 3 mm über den Platinenrand hinaus.** |
 | **J2 (USB-C)** | **USB-C 16-Pin Receptacle** | SMD/THT Hybrid (z.B. GCT USB4085) | Auf oberer Längsseite gegenüber RJ45. Zum Programmieren, Flashen und Auslesen des Seriellen Monitors am PC. |
 | **J3 (24V In)** | **JST-XH 2-Pin (2,50 mm)** | THT vertikal | Oben links: Stromeingang direkt von der 24V-Schiene des Epson-Druckers. |
 | **J4 (Drucker-USB)**| **JST-XH 4-Pin (2,50 mm)** | THT vertikal | Oben links neben J3: Führt 5V, D-, D+, GND direkt zu den 4 USB-Pins des Epson TM-T88. |
@@ -90,16 +96,17 @@ Vollständige Anleitung und Projektdaten für eine maßgeschneiderte All-in-One-
 ## 5. Das KiCad-Projekt verwenden
 
 Die Projektdateien befinden sich direkt in diesem Ordner:
-* **`BonbridgeESP32_CustomBoard.kicad_pro`**: KiCad 7 / 8 Projektdatei.
-* **`BonbridgeESP32_CustomBoard.kicad_pcb`**: Vollständig vordefiniertes Board-Layout mit exakter Außenkontur (55×25 mm), Bohrungen und Footprint-Platzierung.
+* **`BonbridgeESP32_CustomBoard.kicad_pro`**: KiCad 7 / 8 / 9 / 10 Projektdatei.
+* **`BonbridgeESP32_CustomBoard.kicad_pcb`**: Vollständig vordefiniertes Board-Layout mit exakter Außenkontur (55×25 mm), 4× M2,5 Bohrungen und Footprint-Platzierung. Getestet und kompatibel mit KiCad 10.0!
 * **`generate_kicad_project.py`**: Python-Generatorskript, das das Board jederzeit neu erzeugen oder anpassen kann.
 
 ### Schritte in KiCad:
 1. Starte **KiCad** und öffne `BonbridgeESP32_CustomBoard.kicad_pro`.
 2. Öffne den **Leiterplatten-Editor (PCB)**:
-   * Die 55 mm × 25 mm Kontur mit abgerundeten Ecken ist bereits fertig gezeichnet.
+   * Die 55 mm × 25 mm Kontur mit abgerundeten Ecken öffnet sich fehlerfrei.
    * Die 4 Befestigungslöcher (M2.5) sind exakt platziert.
-   * RJ45 befindet sich an der unteren Längsseite, USB-C gegenüber an der oberen Längsseite, und beide JST-Stecker sitzen links oben nebeneinander.
+   * RJ45 ragt 3 mm nach unten über den Rand hinaus.
+   * USB-C und die beiden JST-Stecker sitzen auf der oberen Längsseite nebeneinander.
 3. **Leiterbahnen routen:**
    * **Empfehlung:** 4-Lagen-Platine (z. B. bei JLCPCB oder Aisler für wenige Euro):
      * *Lage 1 (Top):* Signale & Bauteile
