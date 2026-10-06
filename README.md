@@ -142,15 +142,32 @@ Ansicht der USB-B-Buchse auf der Druckerplatine (von hinten / Lötseite):
 > [!TIP]
 > **Identifikation mit dem Multimeter:** Das metallene Abschirmgehäuse der USB-B-Buchse ist immer mit **GND** verbunden. Halte eine Prüfspitze an das Metallgehäuse und teste mit dem Durchgangsprüfer (Piepser) die 4 Pins: Nur **Pin 4** hat Durchgang zu GND. Damit weißt du sofort, wie die Buchse ausgerichtet ist!
 
-##### Abbildung 2: Verdrahtungsschema zwischen Epson TM-T88 und diymore ESP32-S3
+##### Abbildung 2: Verdrahtungsschema zwischen Epson TM-T88 und Seeed Studio XIAO ESP32-S3
+Auf der Rückseite des Seeed Studio XIAO ESP32-S3 befinden sich zwei dedizierte Lötpads **`D+`** und **`D-`**:
+
 ```text
-Epson TM-T88 Platine (USB-B Buchse)              diymore ESP32-S3 Board
+Epson TM-T88 Platine (USB-B Buchse)              Seeed Studio XIAO ESP32-S3 (Rückseite)
 ┌─────────────────────────────────┐              ┌───────────────────────────┐
-│ Pin 1: VBUS (+5V) ──────────────┼──[ Rot ]─────┼─► Pin 5V (oder VIN)       │
-│ Pin 2: D- (Data Minus) ─────────┼──[ Weiß ]────┼─► Pin GPIO 19             │
-│ Pin 3: D+ (Data Plus) ──────────┼──[ Grün ]────┼─► Pin GPIO 20             │
-│ Pin 4: GND (Masse) ─────────────┼──[ Schwarz ]─┼─► Pin GND                 │
+│ Pin 1: VBUS (+5V) ──────────────┼──[ Rot ]─────┼─► Pin 5V (VUSB)           │
+│ Pin 2: D- (Data Minus) ─────────┼──[ Weiß ]────┼─► Lötpad D- (Unterseite)  │
+│ Pin 3: D+ (Data Plus) ──────────┼──[ Grün ]────┼─► Lötpad D+ (Unterseite)  │
+│ Pin 4: GND (Masse) ─────────────┼──[ Schwarz ]─┼─► Pin GND (Masse)         │
 └─────────────────────────────────┘              └───────────────────────────┘
+```
+
+```text
+               Seeed Studio XIAO ESP32-S3 (Rückseite):
+                             ┌─── USB-C ───┐
+                  (5V) VUSB  │             │ MTDI
+                        GND  │   (Testpads)│ EN
+                        3V3  │  D+      D- │ MTMS
+                             │  [O]    [O] │ BAT -
+                       (D10) │   ▲      ▲  │ BAT +
+                        (D9) │   │      │  │
+                        (D8) │   │      └───────► Weiß (D-) zum Drucker Pin 2
+                        (D7) │   └──────────────► Grün (D+) zum Drucker Pin 3
+                             │  [Thermal]  │
+                             └─────────────┘
 ```
 
 ```mermaid
