@@ -67,11 +67,41 @@ Er nimmt Druckaufträge über ein **Netzwerkkabel (LAN)** oder über **WLAN** en
 > * Auch die 5V-Leitung der USB-Buchse für den Drucker muss mit 5V versorgt werden, damit der Druckeranschluss Strom hat.
 
 ### 2. W5500 Netzwerk-Modul (LAN-Kabel)
-Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 
+Das W5500-Modul wird über den SPI-Bus mit dem ESP32-S3 verbunden. Je nachdem, welches Entwicklungsboard du verwendest, wähle die passende Belegung:
+
+#### 2.1 Für Seeed Studio XIAO ESP32-S3 (14-Pin Kompaktboard von Amazon)
+Das daumengroße XIAO-Board führt nur 11 GPIO-Pins (GPIO 1–9, 43, 44) nach außen. Die Hardware-SPI-Pins sind dort auf **GPIO 7, 8 und 9** gelegt (im Hersteller-Pinout gelb als SCK, MISO, MOSI markiert):
+
+| W5500 Pin | XIAO ESP32-S3 Pin | Board-Beschriftung | Funktion |
+|---|---|---|---|
+| **VCC** | **3.3V** | `3V3` (oben rechts) | **3,3V Stromversorgung** *(Achtung: Nicht an 5V!)* |
+| **GND** | **GND** | `GND` (oben rechts) | Masse / Minus |
+| **SCLK / CLK** | **GPIO 7** | `D8` / `SCK` (gelb) | SPI Taktleitung |
+| **MISO** | **GPIO 8** | `D9` / `MISO` (gelb) | SPI Datenleitung vom W5500 zum ESP32 |
+| **MOSI** | **GPIO 9** | `D10` / `MOSI` (gelb) | SPI Datenleitung vom ESP32 zum W5500 |
+| **CS / SCS** | **GPIO 3** | `D2` (links) | Modulauswahl (Chip Select) |
+| **INT** | **GPIO 2** | `D1` (links) | Unterbrechungssignal (Interrupt) |
+| **RST** | **GPIO 1** | `D0` (links) | Hardware-Reset |
+
+```text
+       Seeed Studio XIAO ESP32-S3 (Draufsicht):
+                 ┌─── USB-C ───┐
+       (D0) GP1  │ [ ]     [ ] │ 5V
+  RST ◄───── GP1 │             │ GND ──────► W5500 GND
+  INT ◄───── GP2 │  ESP32-S3   │ 3V3 ──────► W5500 VCC (3.3V!)
+   CS ◄───── GP3 │             │ GP9 ──────► W5500 MOSI (D10)
+            GP4  │   [IPEX]    │ GP8 ──────► W5500 MISO (D9)
+            GP5  │    Ant.     │ GP7 ──────► W5500 SCLK (D8)
+            GP6  │             │ GP44 (D7)
+       (D6) GP43 │             │ GP44
+                 └─────────────┘
+```
+
+#### 2.2 Für großes ESP32-S3 DevKit (38/44 Pins) & Bonbridge Custom PCB
 | W5500 Pin | ESP32-S3 Pin | Funktion |
 |---|---|---|
-| **VCC** | **3.3V** | Stromversorgung Modul |
+| **VCC** | **3.3V** | Stromversorgung Modul (3,3V) |
 | **GND** | **GND** | Masse / Minus |
 | **MOSI** | **GPIO 11** | Datenleitung zum Modul |
 | **MISO** | **GPIO 12** | Datenleitung vom Modul |
@@ -79,6 +109,9 @@ Das W5500-Modul wird über die SPI-Leitungen mit dem ESP32-S3 verbunden:
 | **CS / SCS** | **GPIO 9** | Modulauswahl (Chip Select) |
 | **INT** | **GPIO 14** | Unterbrechungssignal |
 | **RST** | **GPIO 13** | Rücksetzleitung (Reset) |
+
+> [!NOTE]
+> Die Pinbelegung kann in `config.h` über `#define BOARD_XIAO_ESP32S3` umgeschaltet werden. Standardmäßig ist das XIAO-Board bereits voreingestellt.
 
 ### 3. USB-Drucker-Anschluss (2 Optionen)
 
